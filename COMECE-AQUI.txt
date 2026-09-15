@@ -1,0 +1,60 @@
+TELEGRAM ATENDIMENTO 3.0.1 — RENDER + SUPABASE
+
+Esta é a versão adaptada. Use este pacote para Render + Supabase, em vez do
+ZIP anterior preparado para VPS. A publicação ainda não foi feita nas suas contas.
+
+O QUE VOCÊ VAI PRECISAR
+
+• Um projeto gratuito no Supabase.
+• Um repositório privado no GitHub para este pacote.
+• Uma conta no Render para conectar esse repositório.
+• Seu API ID e API Hash do Telegram.
+
+Não precisa instalar Node.js nem executar comandos no seu computador.
+Não precisa comprar domínio: você usará o endereço HTTPS fornecido pelo Render.
+
+COMECE PELO SUPABASE
+
+1. Entre em https://supabase.com/dashboard e crie um projeto novo no plano Free,
+   dedicado à extensão. Nome sugerido: telegram-atendimento.
+2. Guarde a senha do banco e aguarde o projeto ficar pronto.
+3. No menu do projeto, abra SQL Editor e crie uma consulta nova.
+4. Abra o arquivo supabase/CONFIGURAR.sql deste pacote no Bloco de Notas.
+5. Copie todo o conteúdo, cole no SQL Editor e clique em Run.
+6. Deve aparecer sucesso. O SQL cria a tabela ta_state e o bucket privado ta-media.
+
+Se preferir fazer por etapas com ajuda, pare aqui e envie uma print do resultado
+do SQL, sem chaves ou informações de login.
+
+O GUIA COMPLETO ESTÁ EM INSTALACAO.md
+
+Depois do Supabase, o guia explica o GitHub, a publicação pelo Blueprint do Render
+e os dois campos que você precisará preencher na extensão.
+
+Não envie chaves, senhas, API Hash ou códigos de login no chat nem em arquivos públicos.
+
+LIMITES DO GRATUITO
+
+O Render gratuito pode adormecer após 15 minutos sem tráfego recebido. O primeiro
+acesso pode levar cerca de um minuto. A extensão aguarda até dois minutos na conexão
+inicial. Sequências em execução são interrompidas se o processo parar ou reiniciar.
+O Supabase preserva a biblioteca, favoritos, sequências e a sessão criptografada.
+As sequências salvas não são apagadas por um reinício, mas envios em andamento não
+são retomados automaticamente. O histórico de envios é da sessão atual do servidor.
+
+Há limites de armazenamento, tráfego e processamento nos planos gratuitos. O Supabase
+Free inclui 1 GB de arquivos e pode pausar projetos após uma semana de inatividade.
+Conversões de vídeos grandes podem ser lentas ou exceder a memória do Render Free.
+Comece validando áudios curtos. Não há mecanismo artificial para evitar a suspensão
+do plano gratuito.
+
+CONDIÇÕES DA ENTREGA
+
+18 testes locais passaram, com clientes de Telegram e Supabase simulados e conversões
+reais pelo FFmpeg. Foram testados os contratos HTTP do adaptador, o armazenamento
+privado, a recuperação após perda dos arquivos locais, a criptografia da sessão,
+a seleção da conversa, sequências e falhas. Não foram usadas suas credenciais.
+Ainda faltam a execução do SQL no Supabase real, o build e deploy no Render e um envio
+real no seu Chrome. O Docker e a interface instalada não foram validados neste ambiente.
+
+PREVIA.html demonstra o layout com dados fictícios e não envia mensagens.

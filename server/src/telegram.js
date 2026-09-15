@@ -1,0 +1,275 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import {encodeSession,decodeSession} from "./session-store.js";
+import { TelegramClient, Api } from "teleproto";
+import { StringSession } from "teleproto/sessions/index.js";
+
+class Deferred {
+  constructor() {
+    this.promise = new Promise((resolve, reject) => {
+      this.resolve = resolve;
+      this.reject = reject;
+    });
+  }
+}
+
+export class TelegramService {
+  constructor({ apiId, apiHash, dataDir, encryptionKey, store = null }) {
+    this.apiId = Number(apiId);
+    this.apiHash = apiHash;
+    this.dataDir = dataDir;
+    this.encryptionKey = encryptionKey;
+    this.store = store;
+    this.sessionPersisted = false;
+    this.sessionPath = path.join(dataDir, "session.enc");
+    this.client = null;
+    this.state = "idle";
+    this.lastError = "";
+    this.pending = null;
+    this.authPromise = null;
+    this.dialogMap = new Map();
+  }
+
+  async init() {
+    await fs.mkdir(this.dataDir, { recursive: true });
+    let saved = "";
+    try {
+      const encrypted=this.store ? await this.store.getState("telegram-session") : await fs.readFile(this.sessionPath,"utf8");
+      if(encrypted) saved = decodeSession(encrypted,this.encryptionKey);
+    } catch (err) { if (err.code !== "ENOENT") throw new Error("Não foi possível abrir a sessão. Verifique a chave de criptografia do servidor."); }
+
+    this.sessionPersisted = !!saved;
+    this.client = new TelegramClient(
+      new StringSession(saved),
+      this.apiId,
+      this.apiHash,
+      {
+        connectionRetries: 5,
+        floodSleepThreshold: 10
+      }
+    );
+
+    await this.client.connect();
+    if (await this.client.checkAuthorization()) {
+      this.state = "authorized";
+    }
+  }
+
+  async status() {
+    if (!this.client) return { authorized: false, state: "idle" };
+
+    let authorized = false;
+    try {
+      authorized = await this.client.checkAuthorization();
+    } catch {}
+
+    if (!authorized) {
+      if (this.state === "authorized") this.state = "idle";
+      return {
+        authorized: false,
+        state: this.state,
+        lastError: this.lastError || null
+      };
+    }
+
+    if(this.store && !this.sessionPersisted){
+      await this.store.setState("telegram-session",encodeSession(this.client.session.save(),this.encryptionKey));
+      this.sessionPersisted=true;
+    }
+    this.state = "authorized";
+    const me = await this.client.getMe();
+    const first = me?.firstName || "";
+    const last = me?.lastName || "";
+    return {
+      authorized: true,
+      state: "authorized",
+      me: {
+        name: `${first} ${last}`.trim() || "Conta Telegram",
+        username: me?.username || null,
+        id: me?.id?.toString?.() || null
+      }
+    };
+  }
+
+  async waitFor(kind) {
+    this.pending = new Deferred();
+    this.state = kind;
+    return await this.pending.promise;
+  }
+
+  async startLogin(phone) {
+    if (!this.client) throw new Error("Cliente Telegram ainda não foi inicializado.");
+    if (await this.client.checkAuthorization()) {
+      this.state = "authorized";
+      return;
+    }
+    if (this.authPromise) return;
+
+    this.lastError = "";
+    this.state = "starting";
+
+    this.authPromise = this.client.start({
+      phoneNumber: async () => phone,
+      phoneCode: async () => await this.waitFor("need_code"),
+      password: async () => await this.waitFor("need_password"),
+      onError: (err) => {
+        this.lastError = this.friendlyError(err);
+      }
+    })
+      .then(async () => {
+        const saved = this.client.session.save();
+        if(this.store) await this.store.setState("telegram-session",encodeSession(saved,this.encryptionKey));
+        else {
+          await fs.writeFile(this.sessionPath, encodeSession(saved,this.encryptionKey), { encoding: "utf8", mode: 0o600 });
+          await fs.chmod(this.sessionPath, 0o600).catch(() => {});
+        }
+        this.sessionPersisted = true;
+        this.pending = null;
+        this.state = "authorized";
+        this.lastError = "";
+      })
+      .catch(err => {
+        this.pending = null;
+        this.state = "error";
+        this.lastError = this.friendlyError(err);
+      })
+      .finally(() => {
+        this.authPromise = null;
+      });
+  }
+
+  submitCode(code) {
+    if (this.state !== "need_code" || !this.pending) {
+      throw new Error("O Telegram não está aguardando um código neste momento.");
+    }
+    const current = this.pending;
+    this.pending = null;
+    this.state = "starting";
+    current.resolve(code);
+  }
+
+  submitPassword(password) {
+    if (this.state !== "need_password" || !this.pending) {
+      throw new Error("O Telegram não está aguardando a senha 2FA neste momento.");
+    }
+    const current = this.pending;
+    this.pending = null;
+    this.state = "starting";
+    current.resolve(password);
+  }
+
+  friendlyError(err) {
+    const raw = String(err?.errorMessage || err?.message || err || "Erro desconhecido");
+    const known = {
+      PHONE_CODE_INVALID: "O código informado está incorreto.",
+      PHONE_CODE_EXPIRED: "O código expirou. Solicite um novo.",
+      PASSWORD_HASH_INVALID: "A senha de verificação em duas etapas está incorreta.",
+      PHONE_NUMBER_INVALID: "O número de telefone informado é inválido.",
+      PHONE_NUMBER_BANNED: "Este número está bloqueado pelo Telegram.",
+      API_ID_INVALID: "O API ID ou API Hash está incorreto.",
+    };
+    for (const [key, value] of Object.entries(known)) {
+      if (raw.includes(key)) return value;
+    }
+    if (raw.includes("FLOOD_WAIT")) {
+      return "O Telegram pediu para aguardar antes de tentar novamente.";
+    }
+    return raw.slice(0, 220);
+  }
+
+  async requireAuthorized() {
+    if (!this.client || !(await this.client.checkAuthorization())) {
+      throw new Error("Conecte sua conta do Telegram primeiro.");
+    }
+  }
+
+  async getDialogs(limit = 60) {
+    await this.requireAuthorized();
+    const dialogs = await this.client.getDialogs({ limit });
+    this.dialogMap.clear();
+
+    return await Promise.all(dialogs.map(async dialog => {
+      const entity = dialog.entity;
+      const id = String(await this.client.getPeerId(entity));
+      this.dialogMap.set(id, entity);
+
+      const first = entity?.firstName || "";
+      const last = entity?.lastName || "";
+      const name =
+        dialog.name ||
+        entity?.title ||
+        `${first} ${last}`.trim() ||
+        entity?.username ||
+        "Conversa";
+
+      return {
+        id,
+        name,
+        username: entity?.username || null,
+        rawId: entity?.id?.toString?.() || null,
+        type: entity?.className || "Peer"
+      };
+    }));
+  }
+
+  async currentTarget(peerKey) {
+    await this.requireAuthorized();
+    if (!/^(?:[1-9]\d{0,19}|@[A-Za-z0-9_]{5,32})$/.test(String(peerKey || ""))) throw new Error("Abra uma conversa privada no Telegram Web.");
+    const entity = await this.resolveTarget(peerKey.startsWith('@') ? {username:peerKey} : {dialogId:peerKey});
+    if (entity.className !== 'User') throw new Error("Esta versão atende conversas privadas. Abra uma conversa com uma pessoa.");
+    const id = String(await this.client.getPeerId(entity));
+    this.dialogMap.set(id,entity);
+    return {id,name: [entity.firstName,entity.lastName].filter(Boolean).join(' ') || entity.username || 'Conversa',username:entity.username || null};
+  }
+
+  async resolveTarget({ dialogId, username }) {
+    await this.requireAuthorized();
+
+    if (username) {
+      const clean = String(username).trim().replace(/^@/, "");
+      if (!clean) throw new Error("Informe um @usuário válido.");
+      return await this.client.getEntity(clean);
+    }
+
+    if (!dialogId) throw new Error("Escolha uma conversa.");
+
+    if (this.dialogMap.has(String(dialogId))) {
+      return this.dialogMap.get(String(dialogId));
+    }
+
+    await this.getDialogs(100);
+    if (this.dialogMap.has(String(dialogId))) {
+      return this.dialogMap.get(String(dialogId));
+    }
+
+    try {
+      return await this.client.getEntity(BigInt(dialogId));
+    } catch {
+      throw new Error("Não consegui localizar essa conversa. Atualize a lista e tente novamente.");
+    }
+  }
+
+  async sendItem(item, target) {
+    const entity = await this.resolveTarget(target);
+    let result;
+    if (item.kind === "text") {
+      result = await this.client.sendMessage(entity, { message: item.text, parseMode: false });
+    } else {
+      const voice = !item.kind || item.kind === "voice";
+      const options = { file: item.path, workers: 1, parseMode: false };
+      if (voice) {
+        options.voiceNote = true;
+        options.attributes = [new Api.DocumentAttributeAudio({
+          voice: true, duration: Math.max(1, Math.round(item.duration || 1))
+        })];
+      }
+      if (item.kind === 'video') {
+        options.supportsStreaming = true;
+        options.attributes = [new Api.DocumentAttributeVideo({duration: item.duration || 1, w:item.width || 2, h:item.height || 2, supportsStreaming:true})];
+      }
+      result = await this.client.sendFile(entity, options);
+    }
+    if (!result?.id) throw new Error("O Telegram não confirmou o envio. Confira a conversa antes de tentar novamente.");
+    return { messageId: String(result.id) };
+  }
+}

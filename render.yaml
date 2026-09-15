@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: telegram-atendimento
+    runtime: docker
+    plan: free
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /tmp/telegram-atendimento
+      - key: FFMPEG_PATH
+        value: /usr/bin/ffmpeg
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: ACCESS_TOKEN
+        generateValue: true
+      - key: SESSION_ENCRYPTION_KEY
+        generateValue: true
