@@ -1,9 +1,9 @@
 {
   "name": "telegram-voice-local-server",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "private": true,
   "type": "module",
-  "description": "Telegram Atendimento online, instala\u00e7\u00e3o privada",
+  "description": "Telegram Atendimento online, instalação privada",
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test src/*.test.js"
@@ -17,6 +17,9 @@
     "express": "^5.1.0",
     "ffmpeg-static": "5.3.0",
     "multer": "^2.0.2",
-    "teleproto": "^1.229.0"
+    "teleproto": "1.229.0"
+  },
+  "overrides": {
+    "mime": "3.0.0"
   }
 }
