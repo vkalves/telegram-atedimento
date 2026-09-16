@@ -1,9 +1,9 @@
-TELEGRAM ATENDIMENTO 4.0 — RENDER + SUPABASE
+TELEGRAM ATENDIMENTO — EXTENSÃO CHROME 5.0 + RENDER + SUPABASE
 
 Esta versão separa a administração da biblioteca do uso diário no Telegram:
 
 - dashboard/: painel web para cadastrar, organizar e ouvir áudios;
-- extension/: extensão Chrome com somente uma barra compacta abaixo do campo de mensagem;
+- extension/: extensão Chrome 5.0 com botão para o dashboard, nomes completos e barra de áudios arrastável abaixo do campo de mensagem;
 - server/: API do Render, conversão OGG/Opus, sessão Telegram e envio como voz;
 - supabase/CONFIGURAR.sql: tabela de estado e bucket privado ta-media.
 
@@ -34,9 +34,9 @@ INSTALAÇÃO DA EXTENSÃO
 
 1. Abra chrome://extensions e ative o Modo do desenvolvedor.
 2. Clique em Carregar sem compactação e escolha a pasta extension.
-3. Abra Opções da extensão e entre com EXTENSION_PASSWORD.
+3. Abra Opções da extensão, entre com EXTENSION_PASSWORD e confirme o endereço do dashboard.
 4. Abra ou atualize o Telegram Web e entre em uma conversa privada.
-5. A barra aparecerá abaixo do campo de mensagem; use o deslizador e clique uma vez no nome do áudio.
+5. A barra aparecerá abaixo do campo de mensagem; arraste para os lados e clique uma vez no nome completo do áudio.
 
 No dashboard, use o cartão da conta Telegram para fazer o primeiro login
 (telefone, código e senha 2FA). A extensão não tem mais painel lateral.
