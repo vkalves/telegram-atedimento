@@ -25,3 +25,5 @@ services:
         generateValue: true
       - key: SESSION_ENCRYPTION_KEY
         generateValue: true
+      - key: DASHBOARD_ORIGINS
+        sync: false

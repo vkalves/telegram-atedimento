@@ -4,10 +4,11 @@ import multer from 'multer';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import {Jobs} from './jobs.js';
-export function createApp({telegram,library,sequences,token,extensionIds=[]}){
+export function createApp({telegram,library,sequences,token,extensionIds=[],dashboardOrigins=[]}){
  if(!token||token.length<32)throw new Error('Configure um ACCESS_TOKEN com pelo menos 32 caracteres.');
  const app=express(),jobs=new Jobs(telegram,library),rates=new Map();
- const allowed=origin=>!origin||(/^chrome-extension:\/\/[a-p]{32}$/.test(origin)&&(!extensionIds.length||extensionIds.includes(origin.split('://')[1])));
+ const allowedDashboards=new Set(dashboardOrigins.map(origin=>String(origin).trim().replace(/\/$/,'')).filter(Boolean));
+ const allowed=origin=>!origin||(/^chrome-extension:\/\/[a-p]{32}$/.test(origin)&&(!extensionIds.length||extensionIds.includes(origin.split('://')[1])))||allowedDashboards.has(origin);
  app.set('trust proxy',1);app.disable('x-powered-by');
  app.use(cors({origin:(origin,cb)=>cb(null,allowed(origin)),methods:['GET','POST','PATCH','DELETE'],allowedHeaders:['Content-Type','Authorization']}));
  app.use((req,res,next)=>{

@@ -78,6 +78,21 @@ necessidade de DuckDNS, domínio próprio ou Caddy.
 7. Cadastre um áudio curto e envie para **Mensagens Salvas**.
 8. Teste a troca entre duas conversas que você controle antes de iniciar atendimentos.
 
+## 5. Publicar o dashboard administrativo
+
+1. No Render, crie um **Static Site** usando o mesmo repositório.
+2. Em **Root Directory**, informe `dashboard`.
+3. Deixe **Build Command** vazio e use `.` em **Publish Directory**.
+4. Publique e copie a URL HTTPS gerada para o dashboard.
+5. Abra o serviço do backend no Render e adicione a variável
+   `DASHBOARD_ORIGINS` com a URL copiada, sem barra no final.
+6. Salve as variáveis e aguarde a nova publicação do backend.
+7. Abra o dashboard, clique em **Configurações** e informe a URL do backend e o
+   mesmo `ACCESS_TOKEN` usado na extensão.
+
+O upload passa pelo backend e é salvo no bucket privado do Supabase. Não coloque
+`SUPABASE_SERVICE_ROLE_KEY`, `sb_secret_...` ou `service_role` no dashboard.
+
 ## O que fica onde
 
 - **GitHub:** código, sem credenciais ou áudios.

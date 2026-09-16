@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#0d8f62">
+  <title>Central de Áudios</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Central de Áudios">
+      <span class="brand-mark" aria-hidden="true">♪</span>
+      <span><strong>Central de Áudios</strong><small>Administração do atendimento</small></span>
+    </a>
+    <div class="top-actions">
+      <span id="connectionBadge" class="badge offline"><i></i> Desconectado</span>
+      <button id="openSettings" class="button ghost" type="button">Configurações</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">BIBLIOTECA ONLINE</p>
+        <h1>Suas respostas, organizadas.</h1>
+        <p>Cadastre e gerencie os áudios usados no atendimento pelo Telegram.</p>
+      </div>
+      <button id="newItem" class="button primary" type="button">+ Novo áudio</button>
+    </section>
+
+    <div id="notice" class="notice" role="status" hidden></div>
+
+    <section id="setupCard" class="setup-card" hidden>
+      <div class="setup-icon" aria-hidden="true">↗</div>
+      <div>
+        <h2>Conecte seu dashboard</h2>
+        <p>Informe uma vez o endereço do backend no Render e a chave de acesso.</p>
+      </div>
+      <button id="setupButton" class="button primary" type="button">Conectar agora</button>
+    </section>
+
+    <section id="library" class="library" hidden>
+      <div class="stats">
+        <article><span>Total de áudios</span><strong id="totalCount">0</strong></article>
+        <article><span>Favoritos</span><strong id="favoriteCount">0</strong></article>
+        <article><span>Categorias</span><strong id="categoryCount">0</strong></article>
+      </div>
+
+      <div class="toolbar">
+        <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar por nome ou categoria…" aria-label="Buscar áudio"></label>
+        <select id="category" aria-label="Filtrar por categoria"><option value="">Todas as categorias</option></select>
+        <button id="favorites" class="button filter" type="button">☆ Favoritos</button>
+        <button id="reload" class="button filter square" type="button" title="Atualizar" aria-label="Atualizar">↻</button>
+      </div>
+
+      <div id="items" class="audio-grid"></div>
+    </section>
+  </main>
+
+  <dialog id="settingsDialog">
+    <form id="settingsForm">
+      <div class="dialog-title"><div><p class="eyebrow">CONEXÃO</p><h2>Configurar dashboard</h2></div><button id="closeSettings" class="close" type="button" aria-label="Fechar">×</button></div>
+      <p class="muted">Use os mesmos dados configurados na extensão. Eles ficam salvos somente neste navegador.</p>
+      <label>Endereço do backend no Render<input id="apiUrl" type="url" required placeholder="https://seu-backend.onrender.com"></label>
+      <label>Chave de acesso<input id="accessToken" type="password" required minlength="32" autocomplete="off" placeholder="ACCESS_TOKEN"></label>
+      <p id="settingsError" class="form-error" role="alert"></p>
+      <button id="saveSettings" class="button primary full" type="submit">Salvar e conectar</button>
+    </form>
+  </dialog>
+
+  <dialog id="itemDialog">
+    <form id="itemForm">
+      <div class="dialog-title"><div><p class="eyebrow">BIBLIOTECA</p><h2 id="itemTitle">Novo áudio</h2></div><button id="closeItem" class="close" type="button" aria-label="Fechar">×</button></div>
+      <label>Nome do áudio<input id="itemName" required maxlength="80" placeholder="Ex.: Boas-vindas"></label>
+      <label>Categoria<input id="itemCategory" list="categories" maxlength="40" value="Geral" placeholder="Ex.: Primeiro contato"><datalist id="categories"></datalist></label>
+      <label id="fileRow" class="upload-box"><span class="upload-icon" aria-hidden="true">↑</span><strong>Escolha o arquivo de áudio</strong><small>MP3, M4A, WAV, AAC, OGG, OPUS, MP4 ou WEBM · até 50 MB</small><input id="itemFile" type="file" accept="audio/*,.mp4,.opus,.webm"></label>
+      <div id="selectedFile" class="selected-file" hidden></div>
+      <p id="itemError" class="form-error" role="alert"></p>
+      <button id="saveItem" class="button primary full" type="submit">Salvar áudio</button>
+    </form>
+  </dialog>
+
+  <dialog id="previewDialog">
+    <div class="dialog-title"><div><p class="eyebrow">PRÉVIA</p><h2 id="previewTitle">Ouvir áudio</h2></div><button id="closePreview" class="close" type="button" aria-label="Fechar">×</button></div>
+    <div id="previewBody" class="preview-body"></div>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

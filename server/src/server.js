@@ -18,7 +18,11 @@ const store=new SupabaseStore({url:process.env.SUPABASE_URL,key:process.env.SUPA
 const telegram=new TelegramService({apiId,apiHash,dataDir,encryptionKey:encryptionHex,store}),library=new VoiceLibrary(dataDir,store),sequences=new Sequences(dataDir,store);
 try{
  await library.init();await sequences.init();await telegram.init();
- const app=createApp({telegram,library,sequences,token,extensionIds:(process.env.EXTENSION_IDS||'').split(',').map(s=>s.trim()).filter(Boolean)});
+ const app=createApp({
+  telegram,library,sequences,token,
+  extensionIds:(process.env.EXTENSION_IDS||'').split(',').map(s=>s.trim()).filter(Boolean),
+  dashboardOrigins:(process.env.DASHBOARD_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean)
+ });
  const server=app.listen(port,'0.0.0.0',()=>console.log(`Telegram Atendimento 3.0 online na porta ${port}`));
  server.on('error',e=>{console.error(e.message);process.exit(1);});
  process.on('SIGTERM',()=>server.close(()=>process.exit(0)));
