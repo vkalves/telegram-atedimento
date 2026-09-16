@@ -8,7 +8,7 @@ import {CategoryStore} from './categories.js';
 import {createApp} from './app.js';
 import {SupabaseStore} from './supabase-store.js';
 const dataDir=path.resolve(process.env.DATA_DIR||'./data'),port=Number(process.env.PORT||8080);
-const apiId=process.env.TELEGRAM_API_ID,apiHash=process.env.TELEGRAM_API_HASH,token=process.env.ACCESS_TOKEN,extensionPassword=process.env.EXTENSION_PASSWORD||'',encryptionKey=process.env.SESSION_ENCRYPTION_KEY;
+const apiId=process.env.TELEGRAM_API_ID,apiHash=process.env.TELEGRAM_API_HASH,token=process.env.ACCESS_TOKEN,extensionPassword=(process.env.EXTENSION_PASSWORD||'').trim(),encryptionKey=process.env.SESSION_ENCRYPTION_KEY;
 // Render-generated secrets use a random string. Derive a 256-bit AES key deterministically.
 const encryptionHex=encryptionKey ? createHash('sha256').update(encryptionKey).digest('hex') : '';
 if(!/^\d+$/.test(apiId||'')||!/^[a-f\d]{32}$/i.test(apiHash||'')||!token||token.length<32||(!encryptionKey||encryptionKey.length<32)){

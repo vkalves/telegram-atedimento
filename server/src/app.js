@@ -16,7 +16,7 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
  app.use((req,res,next)=>{
   res.set('Cache-Control','no-store');
   if(!allowed(req.get('Origin')))return res.status(403).json({error:'Origem não autorizada.'});
-  if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'4.0.3',apiVersion:'3.0.1'});
+  if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'4.0.3',apiVersion:'3.0.1',extensionPasswordConfigured:!!extensionPassword});
   const origin=req.get('Origin')||'',supplied=Buffer.from(req.get('Authorization')||'');
   const matches=secret=>{const expected=Buffer.from('Bearer '+secret);return supplied.length===expected.length&&crypto.timingSafeEqual(supplied,expected);};
   const extensionOrigin=/^chrome-extension:\/\/[a-p]{32}$/.test(origin);
