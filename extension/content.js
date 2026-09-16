@@ -16,28 +16,43 @@
   host.style.cssText = 'position:fixed;display:none;z-index:2147483646;pointer-events:auto;box-sizing:border-box;';
   const root = host.attachShadow({mode:'open'});
   root.innerHTML = `<style>
-    :host{all:initial;color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    :host{all:initial;color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     *{box-sizing:border-box}
-    .bar{display:flex;align-items:center;gap:7px;min-height:42px;width:100%;padding:5px 7px;border:1px solid #d9e1e8;border-radius:10px;background:rgba(255,255,255,.98);box-shadow:0 5px 18px rgba(26,44,61,.18);color:#263746;overflow:hidden}
-    .title{display:flex;align-items:center;gap:5px;flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.15px;color:#6c7d8c;white-space:nowrap}
-    .dot{width:6px;height:6px;border-radius:50%;background:#36a8f4;box-shadow:0 0 0 3px rgba(54,168,244,.14)}
-    .items{display:flex;align-items:center;gap:5px;min-width:0;flex:1;overflow-x:auto;scrollbar-width:none;padding:1px 0}
-    .items::-webkit-scrollbar{display:none}
     button{font:600 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;border:0;cursor:pointer;white-space:nowrap}
-    .audio{display:inline-flex;align-items:center;gap:5px;max-width:170px;min-height:29px;padding:0 10px;border-radius:15px;background:#edf6fe;color:#2787c8;overflow:hidden;text-overflow:ellipsis}
-    .audio:hover{background:#dfeffc}.audio:active{transform:scale(.98)}.audio:disabled{opacity:.65;cursor:wait}
-    .audio-label{overflow:hidden;text-overflow:ellipsis;max-width:130px}
-    .utility{width:27px;height:27px;padding:0;border-radius:50%;background:transparent;color:#81909d;font-size:17px;flex:0 0 auto}
-    .utility:hover{background:#eef3f7;color:#318ac7}
-    .message{font-size:10px;color:#778692;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 3px}
-    .message.error{color:#c54e56}.message.success{color:#249567}.setup{color:#2787c8;background:transparent;padding:5px 4px}
-    @media (prefers-color-scheme:dark){
-      .bar{border-color:#435363;background:rgba(36,49,61,.98);color:#e7eef4;box-shadow:0 5px 18px rgba(0,0,0,.35)}
-      .title{color:#aab7c2}.audio{background:#263f52;color:#70c2fa}.audio:hover{background:#2e4d65}.utility{color:#9caeba}.utility:hover{background:#30404d;color:#70c2fa}.message{color:#aab7c2}.message.error{color:#ff8990}.message.success{color:#68d2a4}
-    }
-    :host([data-theme="dark"]){color-scheme:dark}
-    :host([data-theme="light"]){color-scheme:light}
-  </style><div class="bar" role="region" aria-label="Áudios de atendimento"><div class="title"><span class="dot"></span><span>Áudios</span></div><div class="items"></div><button class="utility refresh" type="button" title="Atualizar áudios" aria-label="Atualizar áudios">↻</button><span class="message" aria-live="polite"></span></div>`;
+    .bar{display:flex;align-items:center;gap:8px;min-height:52px;width:100%;padding:7px 9px;border:1px solid #30363c;border-radius:11px;background:#202428;box-shadow:0 7px 22px rgba(0,0,0,.34);color:#f2f5f7;overflow:hidden}
+    .brand-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:50%;flex:0 0 auto;color:#fff;background:linear-gradient(145deg,#7357ff 8%,#1689ed 88%);box-shadow:0 6px 16px rgba(31,105,226,.35)}
+    .brand-button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+    .items{display:flex;align-items:center;gap:7px;min-width:0;flex:1;overflow-x:auto;scrollbar-width:none;padding:1px 0}
+    .items::-webkit-scrollbar{display:none}
+    .audio{display:inline-flex;align-items:center;gap:7px;max-width:180px;height:38px;padding:0 13px;border-radius:8px;background:#075c7c;color:#23c9ff;box-shadow:inset 0 0 0 1px rgba(39,199,255,.08);transition:background .15s,transform .12s,color .15s;overflow:hidden}
+    .audio:hover{background:#087399;color:#6edcff}.audio:active{transform:scale(.98)}.audio:disabled{opacity:.58;cursor:wait}
+    .audio-icon{display:grid;place-items:center;flex:0 0 auto}.audio-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .audio-label{overflow:hidden;text-overflow:ellipsis;max-width:136px}
+    .message{max-width:160px;font-size:10px;color:#9da7ae;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+    .message.error{color:#ff858f}.message.success{color:#66d7a5}.setup{height:36px;color:#4bcfff;background:#30363b;border-radius:8px;padding:0 12px}
+    .rail{position:fixed;z-index:2147483646;right:0;top:0;bottom:0;width:60px;display:flex;flex-direction:column;align-items:stretch;background:#26243c;border-left:1px solid #3b3757;box-shadow:-5px 0 18px rgba(0,0,0,.2);pointer-events:auto}
+    .rail-brand{display:grid;place-items:center;height:58px;color:#fff;background:linear-gradient(145deg,#7357ff,#1689ed)}
+    .rail-brand svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .rail-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;height:70px;padding:5px 2px;background:transparent;color:#c6c3d6;font-size:9px;font-weight:500}
+    .rail-item svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+    .rail-item.active{color:#fff;background:linear-gradient(180deg,#5f3cb7,#4d378e)}
+    .rail-item.action:hover{color:#fff;background:#34314d}.rail-item.action:active{background:#403b5d}.rail-item:disabled{opacity:.5;cursor:wait}
+    .count{position:absolute;right:7px;top:8px;display:grid;place-items:center;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:#20bf7a;color:#fff;font-size:8px;font-weight:700}
+    .rail-spacer{flex:1}.rail-footer{border-top:1px solid #3b3757}
+    @media (max-width:700px){.rail{width:54px}.rail-item{height:64px}.message{display:none}}
+  </style>
+  <div class="bar" role="region" aria-label="Áudios de atendimento">
+    <div class="brand-button" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 8h14M5 12h9M5 16h11"/></svg></div>
+    <div class="items"></div>
+    <span class="message" aria-live="polite"></span>
+  </div>
+  <aside class="rail" aria-label="Telegram Atendimento">
+    <div class="rail-brand" title="Telegram Atendimento 4.0"><svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></div>
+    <div class="rail-item active"><span class="count">0</span><svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg><span>Áudios</span></div>
+    <button class="rail-item action refresh" type="button" title="Atualizar áudios" aria-label="Atualizar áudios"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/></svg><span>Atualizar</span></button>
+    <div class="rail-spacer"></div>
+    <button class="rail-item action settings rail-footer" type="button" title="Abrir ajustes" aria-label="Abrir ajustes"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M10 14v6"/></svg><span>Ajustes</span></button>
+  </aside>`;
 
   document.documentElement.append(host);
 
@@ -45,6 +60,8 @@
   const itemsElement = root.querySelector('.items');
   const messageElement = root.querySelector('.message');
   const refreshButton = root.querySelector('.refresh');
+  const settingsButton = root.querySelector('.settings');
+  const countElement = root.querySelector('.count');
   const state = {key:null,target:null,stamp:'',generation:0,configured:false,items:[],loading:false,error:''};
   const inFlight = new Map();
   const feedback = new Map();
@@ -87,9 +104,12 @@
     const composer = findComposer();
     if (!composer || !state.key) {host.style.display = 'none';return;}
     const rect = composer.getBoundingClientRect();
-    const width = Math.max(210, Math.min(rect.width, window.innerWidth - 16));
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-    const barHeight = bar.getBoundingClientRect().height || 42;
+    const railWidth = window.innerWidth <= 700 ? 54 : 60;
+    const maxRight = window.innerWidth - railWidth - 8;
+    const availableWidth = Math.max(210, maxRight - rect.left);
+    const width = Math.max(210, Math.min(rect.width, availableWidth));
+    const left = Math.max(8, Math.min(rect.left, maxRight - width));
+    const barHeight = bar.getBoundingClientRect().height || 52;
     const top = Math.max(6, rect.top - barHeight - 5);
     host.style.left = `${left}px`;
     host.style.top = `${top}px`;
@@ -114,7 +134,6 @@
   }
 
   function render() {
-    host.dataset.theme = document.documentElement.classList.contains('night') || document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light';
     itemsElement.replaceChildren();
     if (!state.key || !findComposer()) {host.style.display = 'none';return;}
     host.style.display = 'block';
@@ -136,9 +155,10 @@
     } else {
       for (const item of state.items) {
         const button = document.createElement('button');button.type='button';button.className='audio';button.title=`Enviar ${item.name}`;button.setAttribute('aria-label',`Enviar ${item.name}`);button.disabled=!state.target||!!busy;
-        const icon=document.createElement('span');icon.textContent='▶';const label=document.createElement('span');label.className='audio-label';label.textContent=item.name;button.append(icon,label);button.onclick=()=>sendItem(item);itemsElement.append(button);
+        const icon=document.createElement('span');icon.className='audio-icon';icon.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>';const label=document.createElement('span');label.className='audio-label';label.textContent=item.name;button.append(icon,label);button.onclick=()=>sendItem(item);itemsElement.append(button);
       }
     }
+    countElement.textContent=String(state.items.length);
     refreshButton.disabled=state.loading||!state.configured;
     schedulePosition();
   }
@@ -234,6 +254,7 @@
   }
 
   refreshButton.onclick=()=>loadLibrary(true);
+  settingsButton.onclick=()=>chrome.runtime.sendMessage({type:'open-options'}).catch(()=>{});
   window.addEventListener('resize',schedulePosition,{passive:true});
   window.addEventListener('scroll',schedulePosition,{passive:true,capture:true});
   window.addEventListener('hashchange',()=>syncContext(true));
