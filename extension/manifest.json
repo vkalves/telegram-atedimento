@@ -1,7 +1,7 @@
 {
  "manifest_version":3,
  "name":"Telegram Atendimento 5",
- "version":"5.0.1",
+ "version":"5.0.2",
  "minimum_chrome_version":"116",
  "description":"Barra prática para enviar áudios como mensagem de voz no Telegram Web.",
  "permissions":["storage"],
