@@ -22,6 +22,13 @@ test('voice includes duration and voice attribute; success requires a Telegram m
   assert.equal((await service.sendItem({path:'/x.ogg',duration:7.8,kind:'voice'},{dialogId:'11'})).messageId,'99');assert.equal(options.voiceNote,true);assert.equal(options.attributes[0].voice,true);assert.equal(options.attributes[0].duration,8);
   service.client.sendFile=async()=>undefined;await assert.rejects(service.sendItem({path:'/x.ogg'},{dialogId:'11'}),/não confirmou/);
 });
+test('flood waits stop the authentication retry loop and preserve the wait message',async()=>{
+ const service=new TelegramService({apiId:1,apiHash:'test',dataDir:'/unused'});let attempts=0,shouldStop;
+ service.client={checkAuthorization:async()=>false,start:async({onError})=>{attempts++;shouldStop=onError({errorMessage:'FLOOD_WAIT_42'});if(shouldStop)throw new Error('AUTH_USER_CANCEL');}};
+ await service.startLogin('+5511999999999');await sleep(0);
+ assert.equal(attempts,1);assert.equal(shouldStop,true);assert.equal(service.state,'error');assert.match(service.lastError,/42 segundos/);assert(service.authRetryAt>Date.now());
+ await assert.rejects(service.startLogin('+5511999999999'),/FLOOD_WAIT_/);
+});
 test('duplicate clicks, per-recipient isolation, cancellation and failures',async()=>{
   const sent=[],tg={requireAuthorized:async()=>{},friendlyError:e=>e.message,sendItem:async(item,target)=>{sent.push([item.id,target.dialogId]);return{messageId:String(sent.length)};}},lib={get:async id=>({id})},jobs=new Jobs(tg,lib);
   const input={requestId:'request-0001',dialogId:'11',steps:[{id:'a',delay:0},{id:'b',delay:1}]};
@@ -86,6 +93,19 @@ test('new private context is resolved and channel contexts are refused',async()=
  assert.equal((await service.currentTarget('77')).id,'77');
  await assert.rejects(service.currentTarget('-10077'));await assert.rejects(service.currentTarget('77_9'));
  service.resolveTarget=async()=>({id:77n,className:'Channel'});await assert.rejects(service.currentTarget('77'),/privadas/);
+});
+
+test('username context resolves quickly and falls back to a matching dialog',async()=>{
+ const service=new TelegramService({apiId:1,apiHash:'test',dataDir:'/unused'});let dialogCalls=0;
+ service.client={
+  checkAuthorization:async()=>true,
+  getEntity:async()=>{throw new Error('username lookup failed');},
+  getDialogs:async()=>{dialogCalls++;return [{name:'Viela 2K',entity:{id:88n,username:'viela2k',firstName:'Viela',lastName:'2K',className:'User'}}];},
+  getPeerId:async entity=>entity.id.toString()
+ };
+ const target=await service.currentTarget('@Viela2K');
+ assert.deepEqual(target,{id:'88',name:'Viela 2K',username:'viela2k'});
+ assert.equal(dialogCalls,1);
 });
 
 test('Supabase-backed audio, favorites and sequences survive removal of all local data',async()=>{
