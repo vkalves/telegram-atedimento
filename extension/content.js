@@ -1,5 +1,6 @@
 (() => {
   const HOST_ID = 'telegram-atendimento-5-audio-bar';
+  const VERSION = '5.0.1';
   const LEGACY_HOST_ID = 'telegram-atendimento-4-audio-bar';
   const legacyHost = document.getElementById(LEGACY_HOST_ID);
   if (legacyHost) {
@@ -13,7 +14,10 @@
       }
     });
   }
-  if (document.getElementById(HOST_ID)) return;
+  const existingHost = document.getElementById(HOST_ID);
+  if (existingHost?.dataset.version === VERSION) return;
+  existingHost?.remove();
+  document.querySelectorAll('.telegram-atendimento-5-bottom-reserve').forEach(element => element.remove());
 
   function peerFromURL(href) {
     try {
@@ -26,7 +30,7 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.dataset.version = '5.0.0';
+  host.dataset.version = VERSION;
   host.style.cssText = 'position:relative;display:none;width:100%;flex:0 0 auto;z-index:2147483646;pointer-events:auto;box-sizing:border-box;padding:0 0 4px;';
   const root = host.attachShadow({mode:'open'});
   root.innerHTML = `<style>
@@ -137,15 +141,6 @@
       .find(element => element.scrollHeight > element.clientHeight || /auto|scroll/i.test(getComputedStyle(element).overflowY)) || null;
   }
 
-  function preserveScrollAfterReserve(scroller, wasNearBottom) {
-    if (!scroller || !wasNearBottom) return;
-    requestAnimationFrame(() => {
-      if (!scroller.isConnected) return;
-      const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-      if (scroller.scrollTop < maxScrollTop - 2) scroller.scrollTop = maxScrollTop;
-    });
-  }
-
   function reserveMessageSpace(telegramInput) {
     const chat = telegramInput.closest('.chat');
     if (!chat) {clearChatReserve();return;}
@@ -157,7 +152,6 @@
       baseChatPadding = previousChatPadding.trim() || getComputedStyle(chat).getPropertyValue('--chat-padding-bottom').trim() || '0px';
     }
     const scroller = messageScroller(chat);
-    const nearBottom = scroller ? scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 180 : false;
     const dockHeight = Math.max(48, Math.ceil(host.getBoundingClientRect().height || 61));
     const bottomPadding = chat.querySelector('.bubbles-padding-bottom');
 
@@ -171,7 +165,6 @@
     }
 
     if (scroller) {
-      let dockChanged = false;
       const spacerParent = bottomPadding?.parentElement || scroller;
       const spacerNeedsRebuild = !reservedDockPadding?.isConnected ||
         reservedDockPadding.parentElement !== spacerParent ||
@@ -184,14 +177,11 @@
         reservedDockPadding.style.cssText = 'width:100%;height:0;flex:0 0 auto;pointer-events:none;';
         if (bottomPadding?.parentElement === spacerParent) bottomPadding.after(reservedDockPadding);
         else spacerParent.append(reservedDockPadding);
-        dockChanged = true;
       }
       const targetHeightText = `${dockHeight}px`;
       if (reservedDockPadding.style.height !== targetHeightText) {
         reservedDockPadding.style.height = targetHeightText;
-        dockChanged = true;
       }
-      preserveScrollAfterReserve(scroller, nearBottom && dockChanged);
     } else {
       reservedDockPadding?.remove();
       reservedDockPadding = null;
@@ -204,7 +194,6 @@
         reservationApplying = false;
         appliedChatPadding = padding;
       }
-      preserveScrollAfterReserve(scroller, nearBottom);
     }
 
     if (!reservationObserver) {
