@@ -21,7 +21,8 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
   const matches=secret=>{const expected=Buffer.from('Bearer '+secret);return supplied.length===expected.length&&crypto.timingSafeEqual(supplied,expected);};
   // The extension password is valid for the authenticated extension/dashboard request.
   // CORS origin validation above still blocks unapproved browser origins.
-  const authorized=matches(token)||(extensionPassword&&matches(extensionPassword));
+  const trustedExtensionOrigin=!!origin&&(/^chrome-extension:\/\/[a-p]{32}$/.test(origin)&&(!extensionIds.length||extensionIds.includes(origin.split('://')[1]))||dashboardOriginSet.has(origin.replace(/\/$/,''))||localDashboard.test(origin));
+  const authorized=matches(token)||(extensionPassword&&trustedExtensionOrigin&&matches(extensionPassword));
   if(!authorized){
    const now=Date.now(),key=req.ip;for(const [k,v]of loginRates)if(now-v.since>60000)loginRates.delete(k);
    const entry=loginRates.get(key)||{since:now,count:0};entry.count++;loginRates.set(key,entry);
