@@ -3,11 +3,11 @@ TELEGRAM ATENDIMENTO 4.0 — RENDER + SUPABASE
 Esta versão separa a administração da biblioteca do uso diário no Telegram:
 
 - dashboard/: painel web para cadastrar, organizar e ouvir áudios;
-- extension/: extensão Chrome com somente uma barra compacta acima do campo de mensagem;
+- extension/: extensão Chrome com somente uma barra compacta abaixo do campo de mensagem;
 - server/: API do Render, conversão OGG/Opus, sessão Telegram e envio como voz;
 - supabase/CONFIGURAR.sql: tabela de estado e bucket privado ta-media.
 
-O dashboard e a extensão usam o ACCESS_TOKEN do Render. A chave secreta do
+O dashboard usa o ACCESS_TOKEN e a extensão usa EXTENSION_PASSWORD. A chave secreta do
 Supabase fica exclusivamente no Render. Não publique credenciais no GitHub.
 
 COMECE PELO SUPABASE
@@ -20,7 +20,7 @@ COMECE PELO SUPABASE
 PUBLICAÇÃO DO BACKEND
 
 Use o Blueprint render.yaml. Preencha SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-TELEGRAM_API_ID e TELEGRAM_API_HASH. Mantenha estáveis ACCESS_TOKEN e
+TELEGRAM_API_ID, TELEGRAM_API_HASH e EXTENSION_PASSWORD. Mantenha estáveis ACCESS_TOKEN e
 SESSION_ENCRYPTION_KEY. Depois do deploy, copie a URL HTTPS do serviço.
 
 PUBLICAÇÃO DO DASHBOARD
@@ -34,9 +34,9 @@ INSTALAÇÃO DA EXTENSÃO
 
 1. Abra chrome://extensions e ative o Modo do desenvolvedor.
 2. Clique em Carregar sem compactação e escolha a pasta extension.
-3. Abra Opções da extensão, informe a URL do Render e o ACCESS_TOKEN.
+3. Abra Opções da extensão e entre com EXTENSION_PASSWORD.
 4. Abra ou atualize o Telegram Web e entre em uma conversa privada.
-5. A barra aparecerá acima do campo de mensagem; clique uma vez no nome do áudio.
+5. A barra aparecerá abaixo do campo de mensagem; use o deslizador e clique uma vez no nome do áudio.
 
 No dashboard, use o cartão da conta Telegram para fazer o primeiro login
 (telefone, código e senha 2FA). A extensão não tem mais painel lateral.

@@ -4,9 +4,10 @@ import multer from 'multer';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import {Jobs} from './jobs.js';
-export function createApp({telegram,library,sequences,categories=null,token,extensionIds=[],dashboardOrigins=[]}){
+export function createApp({telegram,library,sequences,categories=null,token,extensionPassword='',extensionIds=[],dashboardOrigins=[]}){
  if(!token||token.length<32)throw new Error('Configure um ACCESS_TOKEN com pelo menos 32 caracteres.');
- const app=express(),jobs=new Jobs(telegram,library),rates=new Map();
+ if(extensionPassword&&extensionPassword.length<8)throw new Error('Configure EXTENSION_PASSWORD com pelo menos 8 caracteres.');
+ const app=express(),jobs=new Jobs(telegram,library),rates=new Map(),loginRates=new Map();
  const dashboardOriginSet=new Set((Array.isArray(dashboardOrigins)?dashboardOrigins:String(dashboardOrigins||'').split(',')).map(origin=>String(origin).trim().replace(/\/$/,'')).filter(Boolean));
  const localDashboard=/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/;
  const allowed=origin=>!origin||((/^chrome-extension:\/\/[a-p]{32}$/.test(origin)&&(!extensionIds.length||extensionIds.includes(origin.split('://')[1])))||dashboardOriginSet.has(origin.replace(/\/$/,''))||localDashboard.test(origin));
@@ -15,9 +16,18 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
  app.use((req,res,next)=>{
   res.set('Cache-Control','no-store');
   if(!allowed(req.get('Origin')))return res.status(403).json({error:'Origem não autorizada.'});
-  if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'4.0.0',apiVersion:'3.0.1'});
-  const supplied=Buffer.from(req.get('Authorization')||''),expected=Buffer.from('Bearer '+token);
-  if(supplied.length!==expected.length||!crypto.timingSafeEqual(supplied,expected))return res.status(401).json({error:'Chave de acesso inválida. Confira a conexão nas configurações.'});
+  if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'4.0.3',apiVersion:'3.0.1'});
+  const origin=req.get('Origin')||'',supplied=Buffer.from(req.get('Authorization')||'');
+  const matches=secret=>{const expected=Buffer.from('Bearer '+secret);return supplied.length===expected.length&&crypto.timingSafeEqual(supplied,expected);};
+  const extensionOrigin=/^chrome-extension:\/\/[a-p]{32}$/.test(origin);
+  const authorized=matches(token)||(extensionOrigin&&extensionPassword&&matches(extensionPassword));
+  if(!authorized){
+   const now=Date.now(),key=req.ip;for(const [k,v]of loginRates)if(now-v.since>60000)loginRates.delete(k);
+   const entry=loginRates.get(key)||{since:now,count:0};entry.count++;loginRates.set(key,entry);
+   if(entry.count>12)return res.status(429).json({error:'Muitas tentativas. Aguarde um minuto.'});
+   return res.status(401).json({error:'Senha incorreta.'});
+  }
+  loginRates.delete(req.ip);
   if(req.path.startsWith('/auth/')&&req.method==='POST'){
    const now=Date.now(),key=req.ip;for(const [k,v]of rates)if(now-v.since>60000)rates.delete(k);
    const entry=rates.get(key)||{since:now,count:0};entry.count++;rates.set(key,entry);if(entry.count>12)return res.status(429).json({error:'Aguarde um minuto antes de tentar novamente.'});

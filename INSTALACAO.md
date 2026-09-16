@@ -3,7 +3,7 @@
 O projeto agora possui duas interfaces separadas:
 
 - **Dashboard:** administra a biblioteca de áudios.
-- **Extensão Chrome:** mostra somente uma barra compacta acima do campo de mensagem do Telegram Web e envia o áudio para a conversa aberta.
+- **Extensão Chrome:** mostra somente uma barra compacta abaixo do campo de mensagem do Telegram Web e envia o áudio para a conversa aberta.
 
 O Render continua sendo a API e o responsável por autenticar a conta do
 Telegram, converter os arquivos para OGG/Opus e enviar a mensagem de voz. O
@@ -35,10 +35,11 @@ coloque a chave secreta em `dashboard/`, `extension/` ou no GitHub.
 | `TELEGRAM_API_ID` | API ID de `my.telegram.org` |
 | `TELEGRAM_API_HASH` | API Hash de `my.telegram.org` |
 | `DASHBOARD_ORIGINS` | URL do dashboard; pode preencher depois |
+| `EXTENSION_PASSWORD` | Senha simples usada apenas para entrar na extensão |
 
 O Blueprint gera `ACCESS_TOKEN` e `SESSION_ENCRYPTION_KEY`. Não troque esses
 valores entre deploys: a sessão Telegram é cifrada com o segundo segredo, e o
-ACCESS_TOKEN é usado pelo dashboard e pela extensão.
+ACCESS_TOKEN é usado pelo dashboard. A extensão usa `EXTENSION_PASSWORD`.
 
 Depois que o serviço ficar **Live**, copie a URL HTTPS da API. O Render Free
 pode dormir após inatividade; o primeiro acesso pode levar algum tempo.
@@ -77,14 +78,14 @@ solicitados somente nessa interface administrativa.
 2. Ative **Modo do desenvolvedor**.
 3. Clique em **Carregar sem compactação** e selecione a pasta `extension`.
 4. Abra **Detalhes → Opções** da extensão.
-5. Informe a URL HTTPS da API do Render e o `ACCESS_TOKEN`; autorize o acesso ao
-   endereço quando o Chrome solicitar.
+5. Digite a senha definida em `EXTENSION_PASSWORD`; autorize o acesso quando o
+   Chrome solicitar.
 6. Abra ou atualize o Telegram Web.
 
 Não haverá popup, painel lateral ou menu de administração. Ao abrir uma
 conversa privada compatível, a extensão identifica o destinatário pela URL e
-mostra apenas os áudios ativos em uma barra horizontal acima do campo de
-mensagem. Um clique inicia o envio; durante a confirmação os botões ficam
+mostra apenas os áudios ativos em uma barra horizontal abaixo do campo de
+mensagem. Use as setas ou o deslizador para acessar os demais áudios. Um clique inicia o envio; durante a confirmação os botões ficam
 desabilitados para evitar duplicidade.
 
 A autenticação da conta Telegram continua sendo feita pela API e usa o mesmo
@@ -104,8 +105,8 @@ Ao iniciar, o backend migra metadados antigos para os campos `active`,
 
 - Uma mensagem de voz continua limitada a 50 MB na entrada e na saída.
 - O bucket `ta-media` permanece privado; o dashboard acessa prévias via API.
-- O ACCESS_TOKEN é administrativo para esta instalação. Use-o apenas em um
-  dashboard privado e nos seus navegadores autorizados.
+- O ACCESS_TOKEN é administrativo e deve ficar apenas no dashboard privado.
+- A senha da extensão deve ter pelo menos 8 caracteres.
 - A extensão atende conversas privadas, como a versão anterior. Grupos,
   canais e links fora de `web.telegram.org` são recusados.
 - O Render gratuito pode hibernar, e conversões podem demorar em arquivos

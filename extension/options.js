@@ -1,38 +1,38 @@
 const $ = id => document.getElementById(id);
+const API_URL = 'https://telegram-atendimento.onrender.com';
 const saved = (await chrome.storage.local.get('connection')).connection || {};
-$('apiUrl').value = saved.url || '';
 $('token').value = saved.token || '';
+if (saved.url === API_URL && saved.token) {
+  notice('Você já está conectado.','success');
+  $('clear').hidden = false;
+}
 
 function notice(text, type = '') {
   $('notice').textContent = text;
   $('notice').className = `notice ${type}`.trim();
 }
 
-function normalizeUrl(value) {
-  const url = new URL(value.trim());
-  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw new Error('Use um endereço HTTPS sem caminho, por exemplo https://telegram-atendimento.onrender.com');
-  return url.origin;
-}
-
 $('form').onsubmit = async event => {
   event.preventDefault();
   const save = $('save');save.disabled = true;
   try {
-    const url = normalizeUrl($('apiUrl').value), token = $('token').value.trim();
-    if (token.length < 32) throw new Error('Confira a chave de acesso completa.');
-    const granted = await chrome.permissions.request({origins:[url + '/*']});
-    if (!granted) throw new Error('Autorize o acesso ao endereço da instalação para continuar.');
-    const response = await fetch(url + '/health',{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(120000)});
+    const token = $('token').value.trim();
+    if (!token) throw new Error('Digite sua senha.');
+    const granted = await chrome.permissions.request({origins:[API_URL + '/*']});
+    if (!granted) throw new Error('Autorize o acesso para continuar.');
+    const response = await fetch(API_URL + '/library?kind=voice&active=true',{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(120000)});
     const data = await response.json().catch(()=>({}));
-    if (!response.ok || !data.ok) throw new Error(data.error || `A instalação respondeu com erro ${response.status}.`);
-    await chrome.storage.local.set({connection:{url,token}});
-    notice('Conexão salva. Abra ou atualize o Telegram Web para usar a barra de áudios.','success');
+    if (response.status === 401) throw new Error('Senha incorreta. Tente novamente.');
+    if (!response.ok || !Array.isArray(data.items)) throw new Error(data.error || 'Não foi possível entrar agora.');
+    await chrome.storage.local.set({connection:{url:API_URL,token}});
+    $('clear').hidden = false;
+    notice('Login realizado. Volte ao Telegram Web.','success');
   } catch (error) {notice(error.message || 'Não foi possível salvar a conexão.','error');}
   finally {save.disabled = false;}
 };
 
 $('clear').onclick = async () => {
   await chrome.storage.local.remove('connection');
-  $('apiUrl').value = '';$('token').value = '';
-  notice('Configuração apagada.');
+  $('token').value = '';$('clear').hidden = true;
+  notice('Você saiu deste navegador.');
 };

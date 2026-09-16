@@ -25,5 +25,7 @@ services:
         sync: false
       - key: ACCESS_TOKEN
         generateValue: true
+      - key: EXTENSION_PASSWORD
+        sync: false
       - key: SESSION_ENCRYPTION_KEY
         generateValue: true

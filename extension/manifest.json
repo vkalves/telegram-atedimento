@@ -1,7 +1,7 @@
 {
  "manifest_version":3,
  "name":"Telegram Atendimento 4",
- "version":"4.0.2",
+ "version":"4.0.3",
  "minimum_chrome_version":"116",
  "description":"Barra compacta para enviar áudios como mensagem de voz no Telegram Web.",
  "permissions":["storage"],

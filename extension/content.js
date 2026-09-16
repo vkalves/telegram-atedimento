@@ -20,48 +20,34 @@
     *{box-sizing:border-box}
     button{font:600 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;border:0;cursor:pointer;white-space:nowrap}
     .bar{display:flex;align-items:center;gap:8px;min-height:52px;width:100%;max-width:var(--chat-input-max-width,720px);margin:5px auto 0;padding:7px 9px;border:1px solid #30363c;border-radius:11px;background:#202428;box-shadow:0 7px 22px rgba(0,0,0,.34);color:#f2f5f7;overflow:hidden}
-    .brand-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:50%;flex:0 0 auto;color:#fff;background:linear-gradient(145deg,#7357ff 8%,#1689ed 88%);box-shadow:0 6px 16px rgba(31,105,226,.35)}
-    .brand-button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
-    .items{display:flex;align-items:center;gap:7px;min-width:0;flex:1;overflow-x:auto;scrollbar-width:none;padding:1px 0}
-    .items::-webkit-scrollbar{display:none}
+    .scroll-control{display:grid;place-items:center;width:34px;height:38px;padding:0;border-radius:9px;flex:0 0 auto;color:#fff;background:linear-gradient(145deg,#7357ff 8%,#1689ed 88%);box-shadow:0 5px 13px rgba(31,105,226,.28)}
+    .scroll-control:hover{filter:brightness(1.12)}.scroll-control:active{transform:scale(.96)}.scroll-control:disabled{opacity:.32;cursor:default;filter:none}
+    .scroll-control svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+    .items{display:flex;align-items:center;gap:7px;min-width:0;flex:1;overflow-x:auto;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:#615be1 transparent;padding:1px 0 5px}
+    .items::-webkit-scrollbar{height:4px}.items::-webkit-scrollbar-track{background:transparent}.items::-webkit-scrollbar-thumb{background:#615be1;border-radius:4px}
     .audio{display:inline-flex;align-items:center;gap:7px;max-width:180px;height:38px;padding:0 13px;border-radius:8px;background:#075c7c;color:#23c9ff;box-shadow:inset 0 0 0 1px rgba(39,199,255,.08);transition:background .15s,transform .12s,color .15s;overflow:hidden}
     .audio:hover{background:#087399;color:#6edcff}.audio:active{transform:scale(.98)}.audio:disabled{opacity:.58;cursor:wait}
     .audio-icon{display:grid;place-items:center;flex:0 0 auto}.audio-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     .audio-label{overflow:hidden;text-overflow:ellipsis;max-width:136px}
     .message{max-width:160px;font-size:10px;color:#9da7ae;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
     .message.error{color:#ff858f}.message.success{color:#66d7a5}.setup{height:36px;color:#4bcfff;background:#30363b;border-radius:8px;padding:0 12px}
-    .rail{position:fixed;z-index:2147483646;right:0;top:0;bottom:0;width:60px;display:flex;flex-direction:column;align-items:stretch;background:#26243c;border-left:1px solid #3b3757;box-shadow:-5px 0 18px rgba(0,0,0,.2);pointer-events:auto}
-    .rail-brand{display:grid;place-items:center;height:58px;color:#fff;background:linear-gradient(145deg,#7357ff,#1689ed)}
-    .rail-brand svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .rail-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;height:70px;padding:5px 2px;background:transparent;color:#c6c3d6;font-size:9px;font-weight:500}
-    .rail-item svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-    .rail-item.active{color:#fff;background:linear-gradient(180deg,#5f3cb7,#4d378e)}
-    .rail-item.action:hover{color:#fff;background:#34314d}.rail-item.action:active{background:#403b5d}.rail-item:disabled{opacity:.5;cursor:wait}
-    .count{position:absolute;right:7px;top:8px;display:grid;place-items:center;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:#20bf7a;color:#fff;font-size:8px;font-weight:700}
-    .rail-spacer{flex:1}.rail-footer{border-top:1px solid #3b3757}
-    @media (max-width:700px){.rail{width:54px}.rail-item{height:64px}.message{display:none}}
+    [hidden]{display:none!important}
+    @media (max-width:700px){.message{display:none}.scroll-control{width:31px}}
   </style>
   <div class="bar" role="region" aria-label="Áudios de atendimento">
-    <div class="brand-button" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 8h14M5 12h9M5 16h11"/></svg></div>
+    <button class="scroll-control previous" type="button" title="Áudios anteriores" aria-label="Mostrar áudios anteriores" hidden><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="items"></div>
+    <button class="scroll-control next" type="button" title="Próximos áudios" aria-label="Mostrar próximos áudios" hidden><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
     <span class="message" aria-live="polite"></span>
-  </div>
-  <aside class="rail" aria-label="Telegram Atendimento">
-    <div class="rail-brand" title="Telegram Atendimento 4.0"><svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></div>
-    <div class="rail-item active"><span class="count">0</span><svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg><span>Áudios</span></div>
-    <button class="rail-item action refresh" type="button" title="Atualizar áudios" aria-label="Atualizar áudios"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/></svg><span>Atualizar</span></button>
-    <div class="rail-spacer"></div>
-    <button class="rail-item action settings rail-footer" type="button" title="Abrir ajustes" aria-label="Abrir ajustes"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M10 14v6"/></svg><span>Ajustes</span></button>
-  </aside>`;
+  </div>`;
 
   document.documentElement.append(host);
 
   const bar = root.querySelector('.bar');
   const itemsElement = root.querySelector('.items');
   const messageElement = root.querySelector('.message');
-  const refreshButton = root.querySelector('.refresh');
-  const settingsButton = root.querySelector('.settings');
-  const countElement = root.querySelector('.count');
+  const previousButton = root.querySelector('.previous');
+  const nextButton = root.querySelector('.next');
   const state = {key:null,target:null,stamp:'',generation:0,configured:false,items:[],loading:false,error:''};
   const inFlight = new Map();
   const feedback = new Map();
@@ -69,6 +55,8 @@
   let libraryBusy = false;
   let jobsBusy = false;
   let configurationBusy = false;
+  let reservedChat = null;
+  let previousChatPadding = '';
 
   function isVisible(element) {
     const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
@@ -98,11 +86,47 @@
     return best;
   }
 
+  function clearChatReserve() {
+    if (reservedChat?.isConnected) {
+      if (previousChatPadding) reservedChat.style.setProperty('--chat-padding-bottom', previousChatPadding);
+      else reservedChat.style.removeProperty('--chat-padding-bottom');
+    }
+    reservedChat = null;
+    previousChatPadding = '';
+  }
+
+  function reserveMessageSpace(telegramInput) {
+    const chat = telegramInput.closest('.chat');
+    if (!chat) {clearChatReserve();return;}
+    if (reservedChat !== chat) {
+      clearChatReserve();
+      reservedChat = chat;
+      previousChatPadding = chat.style.getPropertyValue('--chat-padding-bottom');
+    }
+    const bubbles = chat.querySelector('.bubbles');
+    const nearBottom = bubbles ? bubbles.scrollHeight - bubbles.scrollTop - bubbles.clientHeight < 180 : false;
+    const dockHeight = Math.ceil(host.getBoundingClientRect().height || 61);
+    const padding = `calc(var(--chat-input-height) + var(--page-chats-padding) + var(--chat-input-height-surplus) + ${dockHeight}px)`;
+    if (chat.style.getPropertyValue('--chat-padding-bottom') === padding) return;
+    chat.style.setProperty('--chat-padding-bottom', padding);
+    if (nearBottom && bubbles) requestAnimationFrame(() => {if (bubbles.isConnected) bubbles.scrollTop = bubbles.scrollHeight;});
+  }
+
+  function updateScroller() {
+    const overflow = itemsElement.scrollWidth - itemsElement.clientWidth > 3;
+    previousButton.hidden = !overflow;
+    nextButton.hidden = !overflow;
+    if (!overflow) return;
+    const max = Math.max(0, itemsElement.scrollWidth - itemsElement.clientWidth);
+    previousButton.disabled = itemsElement.scrollLeft <= 2;
+    nextButton.disabled = itemsElement.scrollLeft >= max - 2;
+  }
+
   function positionBar() {
     scheduledPosition = false;
     if (host.style.display === 'none') return;
     const composer = findComposer();
-    if (!composer || !state.key) {host.style.display = 'none';return;}
+    if (!composer || !state.key) {host.style.display = 'none';clearChatReserve();return;}
     const telegramInput = composer.closest('.chat-input');
     if (telegramInput) {
       if (host.parentElement !== telegramInput) telegramInput.append(host);
@@ -110,11 +134,12 @@
       host.style.left = 'auto';
       host.style.top = 'auto';
       host.style.width = '100%';
+      reserveMessageSpace(telegramInput);
       return;
     }
+    clearChatReserve();
     const rect = composer.getBoundingClientRect();
-    const railWidth = window.innerWidth <= 700 ? 54 : 60;
-    const maxRight = window.innerWidth - railWidth - 8;
+    const maxRight = window.innerWidth - 8;
     const availableWidth = Math.max(210, maxRight - rect.left);
     const width = Math.max(210, Math.min(rect.width, availableWidth));
     const left = Math.max(8, Math.min(rect.left, maxRight - width));
@@ -144,8 +169,9 @@
   }
 
   function render() {
+    const previousScroll = itemsElement.scrollLeft;
     itemsElement.replaceChildren();
-    if (!state.key || !findComposer()) {host.style.display = 'none';return;}
+    if (!state.key || !findComposer()) {host.style.display = 'none';clearChatReserve();return;}
     host.style.display = 'block';
     const busy = state.target && inFlight.has(state.target.id);
     const note = currentFeedback();
@@ -168,8 +194,7 @@
         const icon=document.createElement('span');icon.className='audio-icon';icon.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>';const label=document.createElement('span');label.className='audio-label';label.textContent=item.name;button.append(icon,label);button.onclick=()=>sendItem(item);itemsElement.append(button);
       }
     }
-    countElement.textContent=String(state.items.length);
-    refreshButton.disabled=state.loading||!state.configured;
+    requestAnimationFrame(()=>{itemsElement.scrollLeft=previousScroll;updateScroller();});
     schedulePosition();
   }
 
@@ -263,8 +288,13 @@
     else await syncContext(true);
   }
 
-  refreshButton.onclick=()=>loadLibrary(true);
-  settingsButton.onclick=()=>chrome.runtime.sendMessage({type:'open-options'}).catch(()=>{});
+  previousButton.onclick=()=>itemsElement.scrollBy({left:-Math.max(180,itemsElement.clientWidth*.72),behavior:'smooth'});
+  nextButton.onclick=()=>itemsElement.scrollBy({left:Math.max(180,itemsElement.clientWidth*.72),behavior:'smooth'});
+  itemsElement.addEventListener('scroll',updateScroller,{passive:true});
+  itemsElement.addEventListener('wheel',event=>{
+    if(Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
+    event.preventDefault();itemsElement.scrollLeft+=event.deltaY;
+  },{passive:false});
   window.addEventListener('resize',schedulePosition,{passive:true});
   window.addEventListener('scroll',schedulePosition,{passive:true,capture:true});
   window.addEventListener('hashchange',()=>syncContext(true));
