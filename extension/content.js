@@ -13,13 +13,13 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
-  host.style.cssText = 'position:fixed;display:none;z-index:2147483646;pointer-events:auto;box-sizing:border-box;';
+  host.style.cssText = 'position:relative;display:none;width:100%;flex:0 0 auto;z-index:2147483646;pointer-events:auto;box-sizing:border-box;padding:0 0 4px;';
   const root = host.attachShadow({mode:'open'});
   root.innerHTML = `<style>
     :host{all:initial;color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     *{box-sizing:border-box}
     button{font:600 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;border:0;cursor:pointer;white-space:nowrap}
-    .bar{display:flex;align-items:center;gap:8px;min-height:52px;width:100%;padding:7px 9px;border:1px solid #30363c;border-radius:11px;background:#202428;box-shadow:0 7px 22px rgba(0,0,0,.34);color:#f2f5f7;overflow:hidden}
+    .bar{display:flex;align-items:center;gap:8px;min-height:52px;width:100%;max-width:var(--chat-input-max-width,720px);margin:5px auto 0;padding:7px 9px;border:1px solid #30363c;border-radius:11px;background:#202428;box-shadow:0 7px 22px rgba(0,0,0,.34);color:#f2f5f7;overflow:hidden}
     .brand-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:50%;flex:0 0 auto;color:#fff;background:linear-gradient(145deg,#7357ff 8%,#1689ed 88%);box-shadow:0 6px 16px rgba(31,105,226,.35)}
     .brand-button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
     .items{display:flex;align-items:center;gap:7px;min-width:0;flex:1;overflow-x:auto;scrollbar-width:none;padding:1px 0}
@@ -103,6 +103,15 @@
     if (host.style.display === 'none') return;
     const composer = findComposer();
     if (!composer || !state.key) {host.style.display = 'none';return;}
+    const telegramInput = composer.closest('.chat-input');
+    if (telegramInput) {
+      if (host.parentElement !== telegramInput) telegramInput.append(host);
+      host.style.position = 'relative';
+      host.style.left = 'auto';
+      host.style.top = 'auto';
+      host.style.width = '100%';
+      return;
+    }
     const rect = composer.getBoundingClientRect();
     const railWidth = window.innerWidth <= 700 ? 54 : 60;
     const maxRight = window.innerWidth - railWidth - 8;
@@ -111,6 +120,7 @@
     const left = Math.max(8, Math.min(rect.left, maxRight - width));
     const barHeight = bar.getBoundingClientRect().height || 52;
     const top = Math.max(6, rect.top - barHeight - 5);
+    host.style.position = 'fixed';
     host.style.left = `${left}px`;
     host.style.top = `${top}px`;
     host.style.width = `${width}px`;
