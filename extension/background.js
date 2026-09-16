@@ -1,4 +1,5 @@
 const TELEGRAM_WEB = 'https://web.telegram.org/';
+const DEFAULT_DASHBOARD_URL = 'https://telegram-atendimento-dashboard.onrender.com';
 
 function isTelegramSender(sender) {
   return sender?.tab?.url?.startsWith(TELEGRAM_WEB);
@@ -12,6 +13,14 @@ async function getConnection() {
   const {connection} = await chrome.storage.local.get('connection');
   if (!connection?.url || !connection?.token) return null;
   return connection;
+}
+
+function dashboardUrl(value) {
+  try {
+    const url = new URL(value || DEFAULT_DASHBOARD_URL);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return DEFAULT_DASHBOARD_URL;
+    return url.href.replace(/\/$/, '');
+  } catch { return DEFAULT_DASHBOARD_URL; }
 }
 
 async function apiRequest(path, {method = 'GET', body} = {}) {
@@ -49,6 +58,14 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
 
   if (message?.type === 'open-options') {
     chrome.runtime.openOptionsPage().then(() => reply({ok:true})).catch(error => reply({error:error.message}));
+    return true;
+  }
+
+  if (message?.type === 'open-dashboard') {
+    getConnection()
+      .then(connection => chrome.tabs.create({url:dashboardUrl(connection?.dashboardUrl)}))
+      .then(() => reply({ok:true}))
+      .catch(error => reply({ok:false,error:error.message || 'Não foi possível abrir o dashboard.'}));
     return true;
   }
 

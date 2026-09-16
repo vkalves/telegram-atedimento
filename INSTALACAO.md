@@ -1,9 +1,9 @@
-# Telegram Atendimento 4.0
+# Telegram Atendimento — Extensão Chrome 5.0
 
 O projeto agora possui duas interfaces separadas:
 
 - **Dashboard:** administra a biblioteca de áudios.
-- **Extensão Chrome:** mostra somente uma barra compacta abaixo do campo de mensagem do Telegram Web e envia o áudio para a conversa aberta.
+- **Extensão Chrome 5.0:** mostra uma barra abaixo do campo de mensagem do Telegram Web, abre o dashboard com um clique e envia áudios para a conversa aberta.
 
 O Render continua sendo a API e o responsável por autenticar a conta do
 Telegram, converter os arquivos para OGG/Opus e enviar a mensagem de voz. O
@@ -78,14 +78,17 @@ solicitados somente nessa interface administrativa.
 2. Ative **Modo do desenvolvedor**.
 3. Clique em **Carregar sem compactação** e selecione a pasta `extension`.
 4. Abra **Detalhes → Opções** da extensão.
-5. Digite a senha definida em `EXTENSION_PASSWORD`; autorize o acesso quando o
-   Chrome solicitar.
+5. Digite a senha definida em `EXTENSION_PASSWORD`, confirme o endereço do
+   dashboard (já vem preenchido com o exemplo do Render) e autorize o acesso
+   quando o Chrome solicitar.
 6. Abra ou atualize o Telegram Web.
 
 Não haverá popup, painel lateral ou menu de administração. Ao abrir uma
 conversa privada compatível, a extensão identifica o destinatário pela URL e
 mostra apenas os áudios ativos em uma barra horizontal abaixo do campo de
-mensagem. Use as setas ou o deslizador para acessar os demais áudios. Um clique inicia o envio; durante a confirmação os botões ficam
+mensagem. O botão **Dashboard** abre o endereço configurado. Os nomes aparecem
+completos; arraste a barra ou use as setas para acessar os demais áudios. Um
+clique inicia o envio; durante a confirmação os botões ficam
 desabilitados para evitar duplicidade.
 
 A autenticação da conta Telegram continua sendo feita pela API e usa o mesmo
@@ -95,7 +98,7 @@ recebe a chave do Supabase.
 
 ## 5. Supabase: é preciso criar algo novo?
 
-Não. A versão 4.0 reutiliza `public.ta_state` e o bucket privado `ta-media`.
+Não. A extensão 5.0 reutiliza `public.ta_state` e o bucket privado `ta-media`.
 
 Ao iniciar, o backend migra metadados antigos para os campos `active`,
 `sortOrder` e `updatedAt`, preserva favoritos/arquivos e cria a categoria

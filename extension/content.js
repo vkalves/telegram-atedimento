@@ -1,6 +1,23 @@
 (() => {
-  const HOST_ID = 'telegram-atendimento-4-audio-bar';
-  if (document.getElementById(HOST_ID)) return;
+  const HOST_ID = 'telegram-atendimento-5-audio-bar';
+  const VERSION = '5.0.2';
+  const LEGACY_HOST_ID = 'telegram-atendimento-4-audio-bar';
+  const legacyHost = document.getElementById(LEGACY_HOST_ID);
+  if (legacyHost) {
+    legacyHost.remove();
+    // 4.0 reserved space through an inline expression. Remove only that
+    // exact shape when the extension is updated without reloading Telegram.
+    document.querySelectorAll('.chat').forEach(chat => {
+      const value = chat.style.getPropertyValue('--chat-padding-bottom').trim();
+      if (/^calc\(var\(--chat-input-height\) \+ var\(--page-chats-padding\) \+ var\(--chat-input-height-surplus\) \+ \d+(?:\.\d+)?px\)$/.test(value)) {
+        chat.style.removeProperty('--chat-padding-bottom');
+      }
+    });
+  }
+  const existingHost = document.getElementById(HOST_ID);
+  if (existingHost?.dataset.version === VERSION) return;
+  existingHost?.remove();
+  document.querySelectorAll('.telegram-atendimento-5-bottom-reserve').forEach(element => element.remove());
 
   function peerFromURL(href) {
     try {
@@ -13,28 +30,34 @@
 
   const host = document.createElement('div');
   host.id = HOST_ID;
+  host.dataset.version = VERSION;
   host.style.cssText = 'position:relative;display:none;width:100%;flex:0 0 auto;z-index:2147483646;pointer-events:auto;box-sizing:border-box;padding:0 0 4px;';
   const root = host.attachShadow({mode:'open'});
   root.innerHTML = `<style>
     :host{all:initial;color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     *{box-sizing:border-box}
     button{font:600 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;border:0;cursor:pointer;white-space:nowrap}
-    .bar{display:flex;align-items:center;gap:8px;min-height:52px;width:100%;max-width:var(--chat-input-max-width,720px);margin:5px auto 0;padding:7px 9px;border:1px solid #30363c;border-radius:11px;background:#202428;box-shadow:0 7px 22px rgba(0,0,0,.34);color:#f2f5f7;overflow:hidden}
+    .bar{display:flex;align-items:center;gap:7px;min-height:52px;width:100%;max-width:var(--chat-input-max-width,720px);margin:5px auto 0;padding:7px 9px;border:1px solid #30363c;border-radius:11px;background:#202428;box-shadow:0 7px 22px rgba(0,0,0,.34);color:#f2f5f7;overflow:hidden}
+    .dashboard{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:38px;padding:0 10px;border-radius:9px;flex:0 0 auto;color:#fff;background:#30363b;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+    .dashboard:hover{background:#3b444b}.dashboard:active{transform:scale(.97)}.dashboard:disabled{opacity:.58;cursor:wait}
+    .dashboard svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     .scroll-control{display:grid;place-items:center;width:34px;height:38px;padding:0;border-radius:9px;flex:0 0 auto;color:#fff;background:linear-gradient(145deg,#7357ff 8%,#1689ed 88%);box-shadow:0 5px 13px rgba(31,105,226,.28)}
     .scroll-control:hover{filter:brightness(1.12)}.scroll-control:active{transform:scale(.96)}.scroll-control:disabled{opacity:.32;cursor:default;filter:none}
     .scroll-control svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
-    .items{display:flex;align-items:center;gap:7px;min-width:0;flex:1;overflow-x:auto;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:#615be1 transparent;padding:1px 0 5px}
+    .items{display:flex;align-items:center;gap:7px;min-width:0;flex:1;overflow-x:auto;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:#615be1 transparent;padding:1px 0 5px;user-select:none;touch-action:pan-y;cursor:grab}
+    .items.dragging{scroll-behavior:auto;cursor:grabbing}
     .items::-webkit-scrollbar{height:4px}.items::-webkit-scrollbar-track{background:transparent}.items::-webkit-scrollbar-thumb{background:#615be1;border-radius:4px}
-    .audio{display:inline-flex;align-items:center;gap:7px;max-width:180px;height:38px;padding:0 13px;border-radius:8px;background:#075c7c;color:#23c9ff;box-shadow:inset 0 0 0 1px rgba(39,199,255,.08);transition:background .15s,transform .12s,color .15s;overflow:hidden}
+    .audio{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;width:max-content;max-width:none;height:38px;padding:0 13px;border-radius:8px;background:#075c7c;color:#23c9ff;box-shadow:inset 0 0 0 1px rgba(39,199,255,.08);transition:background .15s,transform .12s,color .15s;overflow:visible}
     .audio:hover{background:#087399;color:#6edcff}.audio:active{transform:scale(.98)}.audio:disabled{opacity:.58;cursor:wait}
     .audio-icon{display:grid;place-items:center;flex:0 0 auto}.audio-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-    .audio-label{overflow:hidden;text-overflow:ellipsis;max-width:136px}
+    .audio-label{display:block;overflow:visible;text-overflow:clip;max-width:none;white-space:nowrap}
     .message{max-width:160px;font-size:10px;color:#9da7ae;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
     .message.error{color:#ff858f}.message.success{color:#66d7a5}.setup{height:36px;color:#4bcfff;background:#30363b;border-radius:8px;padding:0 12px}
     [hidden]{display:none!important}
-    @media (max-width:700px){.message{display:none}.scroll-control{width:31px}}
+    @media (max-width:700px){.message{display:none}.scroll-control{width:31px}.dashboard{padding:0 9px}.dashboard-label{display:none}}
   </style>
   <div class="bar" role="region" aria-label="Áudios de atendimento">
+    <button class="dashboard" type="button" title="Abrir dashboard" aria-label="Abrir dashboard"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg><span class="dashboard-label">Dashboard</span></button>
     <button class="scroll-control previous" type="button" title="Áudios anteriores" aria-label="Mostrar áudios anteriores" hidden><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="items"></div>
     <button class="scroll-control next" type="button" title="Próximos áudios" aria-label="Mostrar próximos áudios" hidden><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
@@ -44,6 +67,7 @@
   document.documentElement.append(host);
 
   const bar = root.querySelector('.bar');
+  const dashboardButton = root.querySelector('.dashboard');
   const itemsElement = root.querySelector('.items');
   const messageElement = root.querySelector('.message');
   const previousButton = root.querySelector('.previous');
@@ -56,7 +80,14 @@
   let jobsBusy = false;
   let configurationBusy = false;
   let reservedChat = null;
+  let reservedDockPadding = null;
   let previousChatPadding = '';
+  let previousChatPaddingPriority = '';
+  let baseChatPadding = '';
+  let appliedChatPadding = '';
+  let usingChatPaddingFallback = false;
+  let reservationObserver = null;
+  let reservationApplying = false;
 
   function isVisible(element) {
     const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
@@ -87,12 +118,27 @@
   }
 
   function clearChatReserve() {
-    if (reservedChat?.isConnected) {
-      if (previousChatPadding) reservedChat.style.setProperty('--chat-padding-bottom', previousChatPadding);
+    reservationObserver?.disconnect();
+    reservationObserver = null;
+    reservedDockPadding?.remove();
+    if (usingChatPaddingFallback && reservedChat?.isConnected) {
+      if (previousChatPadding) reservedChat.style.setProperty('--chat-padding-bottom', previousChatPadding, previousChatPaddingPriority);
       else reservedChat.style.removeProperty('--chat-padding-bottom');
     }
     reservedChat = null;
+    reservedDockPadding = null;
     previousChatPadding = '';
+    previousChatPaddingPriority = '';
+    baseChatPadding = '';
+    appliedChatPadding = '';
+    usingChatPaddingFallback = false;
+  }
+
+  function messageScroller(chat) {
+    const preferred = chat.querySelector('.bubbles-scrollable');
+    if (preferred) return preferred;
+    return [...chat.querySelectorAll('.scrollable, .bubbles')]
+      .find(element => element.scrollHeight > element.clientHeight || /auto|scroll/i.test(getComputedStyle(element).overflowY)) || null;
   }
 
   function reserveMessageSpace(telegramInput) {
@@ -102,14 +148,60 @@
       clearChatReserve();
       reservedChat = chat;
       previousChatPadding = chat.style.getPropertyValue('--chat-padding-bottom');
+      previousChatPaddingPriority = chat.style.getPropertyPriority('--chat-padding-bottom');
+      baseChatPadding = previousChatPadding.trim() || getComputedStyle(chat).getPropertyValue('--chat-padding-bottom').trim() || '0px';
     }
-    const bubbles = chat.querySelector('.bubbles');
-    const nearBottom = bubbles ? bubbles.scrollHeight - bubbles.scrollTop - bubbles.clientHeight < 180 : false;
-    const dockHeight = Math.ceil(host.getBoundingClientRect().height || 61);
-    const padding = `calc(var(--chat-input-height) + var(--page-chats-padding) + var(--chat-input-height-surplus) + ${dockHeight}px)`;
-    if (chat.style.getPropertyValue('--chat-padding-bottom') === padding) return;
-    chat.style.setProperty('--chat-padding-bottom', padding);
-    if (nearBottom && bubbles) requestAnimationFrame(() => {if (bubbles.isConnected) bubbles.scrollTop = bubbles.scrollHeight;});
+    const scroller = messageScroller(chat);
+    const dockHeight = Math.max(48, Math.ceil(host.getBoundingClientRect().height || 61));
+    const bottomPadding = chat.querySelector('.bubbles-padding-bottom');
+
+    if (scroller && usingChatPaddingFallback) {
+      reservationApplying = true;
+      if (previousChatPadding) chat.style.setProperty('--chat-padding-bottom', previousChatPadding, previousChatPaddingPriority);
+      else chat.style.removeProperty('--chat-padding-bottom');
+      reservationApplying = false;
+      appliedChatPadding = '';
+      usingChatPaddingFallback = false;
+    }
+
+    if (scroller) {
+      const spacerParent = bottomPadding?.parentElement || scroller;
+      const spacerNeedsRebuild = !reservedDockPadding?.isConnected ||
+        reservedDockPadding.parentElement !== spacerParent ||
+        (!!bottomPadding && reservedDockPadding.previousElementSibling !== bottomPadding);
+      if (spacerNeedsRebuild) {
+        reservedDockPadding?.remove();
+        reservedDockPadding = document.createElement('div');
+        reservedDockPadding.className = 'telegram-atendimento-5-bottom-reserve';
+        reservedDockPadding.setAttribute('aria-hidden', 'true');
+        reservedDockPadding.style.cssText = 'width:100%;height:0;flex:0 0 auto;pointer-events:none;';
+        if (bottomPadding?.parentElement === spacerParent) bottomPadding.after(reservedDockPadding);
+        else spacerParent.append(reservedDockPadding);
+      }
+      const targetHeightText = `${dockHeight}px`;
+      if (reservedDockPadding.style.height !== targetHeightText) {
+        reservedDockPadding.style.height = targetHeightText;
+      }
+    } else {
+      reservedDockPadding?.remove();
+      reservedDockPadding = null;
+      // Fallback for older Telegram Web layouts without a scrollable message container.
+      const padding = `calc(${baseChatPadding} + ${dockHeight}px)`;
+      usingChatPaddingFallback = true;
+      if (appliedChatPadding !== padding || chat.style.getPropertyValue('--chat-padding-bottom') !== padding) {
+        reservationApplying = true;
+        chat.style.setProperty('--chat-padding-bottom', padding);
+        reservationApplying = false;
+        appliedChatPadding = padding;
+      }
+    }
+
+    if (!reservationObserver) {
+      reservationObserver = new MutationObserver(() => {
+        if (!reservationApplying) schedulePosition();
+      });
+      reservationObserver.observe(chat, {attributes:true, attributeFilter:['style','class']});
+    }
   }
 
   function updateScroller() {
@@ -288,6 +380,14 @@
     else await syncContext(true);
   }
 
+  dashboardButton.onclick=async()=>{
+    dashboardButton.disabled=true;
+    try {
+      const result=await chrome.runtime.sendMessage({type:'open-dashboard'});
+      if (!result?.ok) setMessage(result?.error || 'Não foi possível abrir o dashboard.','error');
+    } catch (error) {setMessage(error.message || 'Não foi possível abrir o dashboard.','error');}
+    finally {dashboardButton.disabled=false;}
+  };
   previousButton.onclick=()=>itemsElement.scrollBy({left:-Math.max(180,itemsElement.clientWidth*.72),behavior:'smooth'});
   nextButton.onclick=()=>itemsElement.scrollBy({left:Math.max(180,itemsElement.clientWidth*.72),behavior:'smooth'});
   itemsElement.addEventListener('scroll',updateScroller,{passive:true});
@@ -295,6 +395,40 @@
     if(Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
     event.preventDefault();itemsElement.scrollLeft+=event.deltaY;
   },{passive:false});
+  const dragState={pointerId:null,startX:0,startScroll:0,moved:false,captured:false,suppressClick:false};
+  itemsElement.addEventListener('pointerdown',event=>{
+    if (event.pointerType==='mouse'&&event.button!==0) return;
+    if (itemsElement.scrollWidth-itemsElement.clientWidth<=3) return;
+    dragState.pointerId=event.pointerId;dragState.startX=event.clientX;dragState.startScroll=itemsElement.scrollLeft;dragState.moved=false;dragState.captured=false;
+  });
+  itemsElement.addEventListener('pointermove',event=>{
+    if (dragState.pointerId!==event.pointerId) return;
+    const distance=event.clientX-dragState.startX;
+    if (Math.abs(distance)>5) dragState.moved=true;
+    if (!dragState.moved) return;
+    if (!dragState.captured) {
+      dragState.captured=true;
+      itemsElement.classList.add('dragging');
+      try {itemsElement.setPointerCapture(event.pointerId);} catch {}
+    }
+    event.preventDefault();itemsElement.scrollLeft=dragState.startScroll-distance;
+  },{passive:false});
+  const finishDrag=event=>{
+    if (dragState.pointerId!==event.pointerId) return;
+    const moved=dragState.moved;
+    try {if (dragState.captured && itemsElement.hasPointerCapture(event.pointerId)) itemsElement.releasePointerCapture(event.pointerId);} catch {}
+    dragState.pointerId=null;dragState.moved=false;dragState.captured=false;itemsElement.classList.remove('dragging');
+    if (moved) {
+      dragState.suppressClick=true;
+      setTimeout(()=>{dragState.suppressClick=false;},0);
+    }
+  };
+  itemsElement.addEventListener('pointerup',finishDrag);
+  itemsElement.addEventListener('pointercancel',finishDrag);
+  itemsElement.addEventListener('click',event=>{
+    if (!dragState.suppressClick) return;
+    event.preventDefault();event.stopPropagation();dragState.suppressClick=false;
+  },true);
   window.addEventListener('resize',schedulePosition,{passive:true});
   window.addEventListener('scroll',schedulePosition,{passive:true,capture:true});
   window.addEventListener('hashchange',()=>syncContext(true));
