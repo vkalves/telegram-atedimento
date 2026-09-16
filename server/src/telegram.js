@@ -28,6 +28,8 @@ export class TelegramService {
     this.pending = null;
     this.authPromise = null;
     this.dialogMap = new Map();
+    this.dialogMapUpdatedAt = 0;
+    this.dialogRefreshPromise = null;
   }
 
   async init() {
@@ -188,7 +190,7 @@ export class TelegramService {
     const dialogs = await this.client.getDialogs({ limit });
     this.dialogMap.clear();
 
-    return await Promise.all(dialogs.map(async dialog => {
+    const rows = await Promise.all(dialogs.map(async dialog => {
       const entity = dialog.entity;
       const id = String(await this.client.getPeerId(entity));
       this.dialogMap.set(id, entity);
@@ -210,13 +212,59 @@ export class TelegramService {
         type: entity?.className || "Peer"
       };
     }));
+    this.dialogMapUpdatedAt = Date.now();
+    return rows;
+  }
+
+  async refreshDialogsForTarget() {
+    const fresh = this.dialogMap.size && Date.now() - this.dialogMapUpdatedAt < 30000;
+    if (fresh) return;
+    if (!this.dialogRefreshPromise) {
+      this.dialogRefreshPromise = this.getDialogs(100).finally(() => {
+        this.dialogRefreshPromise = null;
+      });
+    }
+    await this.dialogRefreshPromise;
+  }
+
+  findDialogByUsername(username) {
+    const expected = String(username || '').replace(/^@/, '').toLowerCase();
+    if (!expected) return null;
+    for (const entity of this.dialogMap.values()) {
+      if (String(entity?.username || '').replace(/^@/, '').toLowerCase() === expected) return entity;
+    }
+    return null;
   }
 
   async currentTarget(peerKey) {
     await this.requireAuthorized();
-    if (!/^(?:[1-9]\d{0,19}|@[A-Za-z0-9_]{5,32})$/.test(String(peerKey || ""))) throw new Error("Abra uma conversa privada no Telegram Web.");
-    const entity = await this.resolveTarget(peerKey.startsWith('@') ? {username:peerKey} : {dialogId:peerKey});
-    if (entity.className !== 'User') throw new Error("Esta versão atende conversas privadas. Abra uma conversa com uma pessoa.");
+    const key = String(peerKey || '').trim();
+    if (!/^(?:[1-9]\d{0,19}|@[A-Za-z0-9_]{5,32})$/.test(key)) throw new Error("Abra uma conversa privada no Telegram Web.");
+
+    let entity;
+    if (key.startsWith('@')) {
+      // Use the direct username lookup first. Loading the full dialog list can
+      // be slow on a sleeping Render instance, which used to leave the
+      // extension stuck on “Identificando…”. The dialog list is only a
+      // fallback for accounts where the username lookup is not enough.
+      entity = this.findDialogByUsername(key);
+      if (!entity) {
+        try {
+          entity = await this.resolveTarget({username:key});
+        } catch (lookupError) {
+          try {
+            await this.refreshDialogsForTarget();
+            entity = this.findDialogByUsername(key);
+          } catch {}
+          if (!entity) throw lookupError;
+        }
+      }
+    } else {
+      entity = await this.resolveTarget({dialogId:key});
+    }
+
+    const className = entity?.className || entity?.constructor?.name;
+    if (!entity || className !== 'User') throw new Error("Esta versão atende conversas privadas. Abra uma conversa com uma pessoa.");
     const id = String(await this.client.getPeerId(entity));
     this.dialogMap.set(id,entity);
     return {id,name: [entity.firstName,entity.lastName].filter(Boolean).join(' ') || entity.username || 'Conversa',username:entity.username || null};
