@@ -27,6 +27,7 @@ export class TelegramService {
     this.lastError = "";
     this.pending = null;
     this.authPromise = null;
+    this.authRetryAt = 0;
     this.dialogMap = new Map();
     this.dialogMapUpdatedAt = 0;
     this.dialogRefreshPromise = null;
@@ -106,6 +107,10 @@ export class TelegramService {
       return;
     }
     if (this.authPromise) return;
+    if (this.authRetryAt > Date.now()) {
+      const seconds = Math.ceil((this.authRetryAt - Date.now()) / 1000);
+      throw new Error(`FLOOD_WAIT_${seconds}`);
+    }
 
     this.lastError = "";
     this.state = "starting";
@@ -116,6 +121,15 @@ export class TelegramService {
       password: async () => await this.waitFor("need_password"),
       onError: (err) => {
         this.lastError = this.friendlyError(err);
+        const seconds = this.floodWaitSeconds(err);
+        if (seconds) {
+          this.authRetryAt = Math.max(this.authRetryAt, Date.now() + seconds * 1000);
+          // teleproto retries authentication while onError returns false.
+          // A flood wait must end this attempt, otherwise the retry loop
+          // immediately sends another auth request and extends the block.
+          return true;
+        }
+        return false;
       }
     })
       .then(async () => {
@@ -133,7 +147,9 @@ export class TelegramService {
       .catch(err => {
         this.pending = null;
         this.state = "error";
-        this.lastError = this.friendlyError(err);
+        // teleproto rejects with AUTH_USER_CANCEL after onError asks it to
+        // stop. Keep the useful Telegram error captured by the callback.
+        if (!this.lastError) this.lastError = this.friendlyError(err);
       })
       .finally(() => {
         this.authPromise = null;
@@ -173,10 +189,22 @@ export class TelegramService {
     for (const [key, value] of Object.entries(known)) {
       if (raw.includes(key)) return value;
     }
-    if (raw.includes("FLOOD_WAIT")) {
-      return "O Telegram pediu para aguardar antes de tentar novamente.";
+    const seconds = this.floodWaitSeconds(err);
+    if (seconds) {
+      const minutes = Math.ceil(seconds / 60);
+      const wait = seconds < 60
+        ? `${seconds} segundo${seconds === 1 ? "" : "s"}`
+        : `${minutes} minuto${minutes === 1 ? "" : "s"}`;
+      return `O Telegram limitou novas tentativas. Aguarde ${wait} antes de tentar novamente.`;
     }
     return raw.slice(0, 220);
+  }
+
+  floodWaitSeconds(err) {
+    const raw = String(err?.errorMessage || err?.message || err || "");
+    const match = raw.match(/FLOOD(?:_PREMIUM)?_WAIT_(\d+)/i);
+    const seconds = Number(err?.seconds || match?.[1] || 0);
+    return Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
   }
 
   async requireAuthorized() {
