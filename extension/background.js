@@ -33,7 +33,11 @@ async function apiRequest(path, {method = 'GET', body} = {}) {
   if (url.origin !== connection.url) throw new Error('Endereço da instalação inválido.');
 
   const headers = {Authorization: `Bearer ${connection.token}`};
-  const options = {method, headers, signal: AbortSignal.timeout(path === '/health' ? 120000 : 30000)};
+  // Waking the Render service and resolving a Telegram username can take
+  // longer than the ordinary library request. Do not abort context discovery
+  // while the server is still completing that first request.
+  const timeout = path === '/health' || path === '/context' ? 120000 : 30000;
+  const options = {method, headers, signal: AbortSignal.timeout(timeout)};
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
