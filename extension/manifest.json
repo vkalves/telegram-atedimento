@@ -1,15 +1,14 @@
 {
  "manifest_version":3,
- "name":"Telegram Atendimento 3",
- "version":"3.0.1",
+ "name":"Telegram Atendimento 3.1",
+ "version":"3.1.0",
  "minimum_chrome_version":"116",
- "description":"Abra a conversa e envie seus áudios e respostas com um clique. Conexão com seu atendimento online.",
- "permissions":["storage","sidePanel"],
+ "description":"Áudios rápidos diretamente acima do campo de mensagem do Telegram Web.",
+ "permissions":["storage"],
  "host_permissions":["https://web.telegram.org/*"],
  "optional_host_permissions":["https://*/*"],
  "background":{"service_worker":"background.js"},
- "side_panel":{"default_path":"panel.html"},
- "action":{"default_title":"Abrir atendimento"},
+ "action":{"default_title":"Configurar atendimento","default_popup":"settings.html"},
  "content_scripts":[{"matches":["https://web.telegram.org/*"],"js":["content.js"]}],
  "icons":{"16":"icons/icon16.png","32":"icons/icon32.png","48":"icons/icon48.png","128":"icons/icon128.png"}
 }

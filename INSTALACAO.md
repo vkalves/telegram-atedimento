@@ -64,18 +64,20 @@ necessidade de DuckDNS, domínio próprio ou Caddy.
 2. Selecione a pasta `extension` deste pacote. Desative as versões anteriores para
    o teste não misturar painéis. Se atualizar uma instalação existente, mantenha
    um backup antes de substituir seus arquivos.
-3. Abra ou atualize o Telegram Web e clique em **Atendimento**.
-4. Em **Configurações**, preencha:
+3. Clique no ícone da extensão **Telegram Atendimento 3.1** na barra do Chrome.
+4. Na janela de configuração, preencha:
 
 | Campo na extensão | O que colocar |
 |---|---|
 | Endereço da sua instalação | URL HTTPS fornecida pelo Render, sem caminho no final |
 | Chave de acesso | `ACCESS_TOKEN` do Render |
 
-5. Clique em **Salvar e conectar** e autorize acesso ao endereço informado.
+5. Clique em **Salvar conexão** e autorize acesso ao endereço informado.
 6. Conecte a mesma conta do Telegram aberta na aba. Digite telefone, código e senha
    de duas etapas, quando solicitados, diretamente no painel.
-7. Cadastre um áudio curto e envie para **Mensagens Salvas**.
+7. Abra ou atualize o Telegram Web. Os áudios cadastrados no dashboard aparecem
+   em uma barra acima do campo de mensagem. Abra **Mensagens Salvas** e clique em
+   um áudio curto para testar o envio.
 8. Teste a troca entre duas conversas que você controle antes de iniciar atendimentos.
 
 ## 5. Publicar o dashboard administrativo
