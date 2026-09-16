@@ -173,6 +173,15 @@
     const dockHeight = Math.max(48, Math.ceil(host.getBoundingClientRect().height || 61));
     const bottomPadding = chat.querySelector('.bubbles-padding-bottom');
 
+    if (bottomPadding && usingChatPaddingFallback) {
+      reservationApplying = true;
+      if (previousChatPadding) chat.style.setProperty('--chat-padding-bottom', previousChatPadding, previousChatPaddingPriority);
+      else chat.style.removeProperty('--chat-padding-bottom');
+      reservationApplying = false;
+      appliedChatPadding = '';
+      usingChatPaddingFallback = false;
+    }
+
     if (bottomPadding !== reservedBottomPadding) {
       bottomPaddingResizeObserver?.disconnect();
       bottomPaddingResizeObserver = null;
@@ -193,6 +202,8 @@
             if (Number.isFinite(measuredHeight) && Math.abs(measuredHeight - appliedBottomPaddingHeight) > 0.5) {
               // Telegram changed its own padding (for example after a multiline
               // composer resize). Keep that base and add only our dock height.
+              previousBottomPaddingHeight = bottomPadding.style.getPropertyValue('height');
+              previousBottomPaddingPriority = bottomPadding.style.getPropertyPriority('height');
               baseBottomPaddingHeight = measuredHeight;
               appliedBottomPaddingHeight = 0;
               schedulePosition();
