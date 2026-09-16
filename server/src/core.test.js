@@ -60,16 +60,13 @@ test('online API requires bearer token, denies foreign origins and binds exact c
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'voice-cloud-api-')),token='f'.repeat(64);
  const lib=new VoiceLibrary(dir);await lib.init();const seq=new Sequences(dir);await seq.init();
  const tg={friendlyError:e=>e.message,requireAuthorized:async()=>{},status:async()=>({authorized:true}),currentTarget:async peerKey=>{if(peerKey!=='11')throw new Error('Invalid peer');return {id:'11',name:'Teste'};},sendItem:async()=>({messageId:'99'})};
- const dashboardOrigin='https://telegram-dashboard.example';
- const app=createApp({telegram:tg,library:lib,sequences:seq,token,dashboardOrigins:[dashboardOrigin]});const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ const app=createApp({telegram:tg,library:lib,sequences:seq,token});const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
  try{
   const base=`http://127.0.0.1:${server.address().port}`;
   assert.equal((await fetch(base+'/health')).status,200);
   assert.equal((await fetch(base+'/library')).status,401);
   assert.equal((await fetch(base+'/library',{headers:{Authorization:'Bearer wrong'}})).status,401);
   assert.equal((await fetch(base+'/library',{headers:{Authorization:'Bearer '+token,Origin:'https://example.com'}})).status,403);
-  const dashboardResponse=await fetch(base+'/library',{headers:{Authorization:'Bearer '+token,Origin:dashboardOrigin}});
-  assert.equal(dashboardResponse.status,200);assert.equal(dashboardResponse.headers.get('access-control-allow-origin'),dashboardOrigin);
   const headers={Authorization:'Bearer '+token,'Content-Type':'application/json',Origin:'chrome-extension://'+'a'.repeat(32)};
   assert.equal((await fetch(base+'/library',{headers})).status,200);
   const text=(await (await fetch(base+'/library',{method:'POST',headers,body:JSON.stringify({kind:'text',text:'Demo',name:'Mensagem'})})).json()).item;

@@ -3,90 +3,88 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#0d8f62">
-  <title>Central de Áudios</title>
+  <meta name="theme-color" content="#f5f8fb">
+  <title>Telegram Atendimento 4.0 · Dashboard</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="#" aria-label="Central de Áudios">
-      <span class="brand-mark" aria-hidden="true">♪</span>
-      <span><strong>Central de Áudios</strong><small>Administração do atendimento</small></span>
-    </a>
-    <div class="top-actions">
-      <span id="connectionBadge" class="badge offline"><i></i> Desconectado</span>
-      <button id="openSettings" class="button ghost" type="button">Configurações</button>
-    </div>
-  </header>
-
-  <main>
-    <section class="hero">
-      <div>
-        <p class="eyebrow">BIBLIOTECA ONLINE</p>
-        <h1>Suas respostas, organizadas.</h1>
-        <p>Cadastre e gerencie os áudios usados no atendimento pelo Telegram.</p>
-      </div>
-      <button id="newItem" class="button primary" type="button">+ Novo áudio</button>
+  <div id="connectionGate" class="gate" hidden>
+    <section class="gate-card">
+      <div class="brand large"><span class="brand-mark">♫</span><div><strong>Telegram Atendimento <small>4.0</small></strong><span>Biblioteca de áudios</span></div></div>
+      <h1>Conecte seu dashboard</h1>
+      <p class="muted">Use o endereço do Render e o mesmo ACCESS_TOKEN configurado na extensão. A chave fica somente neste navegador.</p>
+      <form id="connectionForm" class="stack-form">
+        <label>Endereço da API do Render<input id="connectionUrl" type="url" required placeholder="https://telegram-atendimento.onrender.com" autocomplete="url"></label>
+        <label>Chave de acesso<input id="connectionToken" type="password" required minlength="32" placeholder="ACCESS_TOKEN do Render" autocomplete="off"></label>
+        <button class="primary wide" type="submit">Testar e entrar</button>
+      </form>
+      <p id="connectionError" class="form-error" role="alert"></p>
     </section>
+  </div>
 
-    <div id="notice" class="notice" role="status" hidden></div>
-
-    <section id="setupCard" class="setup-card" hidden>
-      <div class="setup-icon" aria-hidden="true">↗</div>
-      <div>
-        <h2>Conecte seu dashboard</h2>
-        <p>Informe uma vez o endereço do backend no Render e a chave de acesso.</p>
+  <div id="appShell" class="app-shell" hidden>
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand"><span class="brand-mark">♫</span><div><strong>Atendimento <small>4.0</small></strong><span>Central de áudios</span></div></div>
+        <button id="closeSidebar" class="icon-button mobile-only" type="button" aria-label="Fechar menu">×</button>
       </div>
-      <button id="setupButton" class="button primary" type="button">Conectar agora</button>
-    </section>
-
-    <section id="library" class="library" hidden>
-      <div class="stats">
-        <article><span>Total de áudios</span><strong id="totalCount">0</strong></article>
-        <article><span>Favoritos</span><strong id="favoriteCount">0</strong></article>
-        <article><span>Categorias</span><strong id="categoryCount">0</strong></article>
+      <nav class="navigation" aria-label="Navegação do dashboard">
+        <button class="nav-item active" data-view="library" type="button"><span class="nav-icon">▦</span> Biblioteca <span id="navAudioCount" class="nav-count">0</span></button>
+        <button class="nav-item" data-view="categories" type="button"><span class="nav-icon">▤</span> Categorias</button>
+      </nav>
+      <div class="telegram-card"><div class="telegram-card-heading"><span id="telegramStatusDot" class="telegram-dot loading"></span><div><strong id="telegramStatusText">Verificando Telegram…</strong><small id="telegramAccountText">Aguarde um instante</small></div></div><button id="connectTelegram" class="sidebar-action" type="button">Conectar conta</button></div>
+      <div class="sidebar-bottom">
+        <div class="online-state"><span></span><div><strong>API conectada</strong><small id="connectedUrl">—</small></div></div>
+        <button id="disconnect" class="sidebar-action" type="button">Trocar conexão</button>
+        <p>As alterações aparecem na extensão automaticamente.</p>
       </div>
+    </aside>
 
-      <div class="toolbar">
-        <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar por nome ou categoria…" aria-label="Buscar áudio"></label>
-        <select id="category" aria-label="Filtrar por categoria"><option value="">Todas as categorias</option></select>
-        <button id="favorites" class="button filter" type="button">☆ Favoritos</button>
-        <button id="reload" class="button filter square" type="button" title="Atualizar" aria-label="Atualizar">↻</button>
-      </div>
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar-heading"><button id="openSidebar" class="icon-button mobile-only" type="button" aria-label="Abrir menu">☰</button><div><p class="eyebrow">BIBLIOTECA DE ÁUDIOS</p><h1 id="pageTitle">Organize seu atendimento</h1><p class="subtitle">Deixe as respostas certas a um clique da conversa.</p></div></div>
+        <div class="topbar-actions"><button id="refresh" class="secondary-button" type="button">↻ <span>Atualizar</span></button><button id="newAudio" class="primary" type="button">+ Novo áudio</button></div>
+      </header>
 
-      <div id="items" class="audio-grid"></div>
-    </section>
-  </main>
+      <section id="libraryView" class="view">
+        <div class="stats-grid">
+          <article class="stat-card"><span class="stat-icon blue">♫</span><div><strong id="totalCount">0</strong><span>Total de áudios</span></div></article>
+          <article class="stat-card"><span class="stat-icon green">✓</span><div><strong id="activeCount">0</strong><span>Ativos na extensão</span></div></article>
+          <article class="stat-card"><span class="stat-icon amber">★</span><div><strong id="favoriteCount">0</strong><span>Favoritos</span></div></article>
+          <article class="stat-card"><span class="stat-icon purple">▤</span><div><strong id="categoryCount">0</strong><span>Categorias</span></div></article>
+        </div>
 
-  <dialog id="settingsDialog">
-    <form id="settingsForm">
-      <div class="dialog-title"><div><p class="eyebrow">CONEXÃO</p><h2>Configurar dashboard</h2></div><button id="closeSettings" class="close" type="button" aria-label="Fechar">×</button></div>
-      <p class="muted">Use os mesmos dados configurados na extensão. Eles ficam salvos somente neste navegador.</p>
-      <label>Endereço do backend no Render<input id="apiUrl" type="url" required placeholder="https://seu-backend.onrender.com"></label>
-      <label>Chave de acesso<input id="accessToken" type="password" required minlength="32" autocomplete="off" placeholder="ACCESS_TOKEN"></label>
-      <p id="settingsError" class="form-error" role="alert"></p>
-      <button id="saveSettings" class="button primary full" type="submit">Salvar e conectar</button>
-    </form>
-  </dialog>
+        <section class="content-card">
+          <div class="section-heading"><div><h2>Seus áudios</h2><p id="listDescription" class="muted">Arraste para alterar a ordem exibida na barra do Telegram.</p></div><button id="clearFilters" class="text-button" type="button" hidden>Limpar filtros</button></div>
+          <div class="filters">
+            <label class="search-field"><span>⌕</span><input id="search" type="search" placeholder="Buscar por nome…" aria-label="Buscar áudio"></label>
+            <select id="categoryFilter" aria-label="Filtrar por categoria"><option value="">Todas as categorias</option></select>
+            <select id="statusFilter" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="active">Ativos</option><option value="inactive">Desativados</option></select>
+            <button id="favoriteFilter" class="filter-button" type="button">☆ Favoritos</button>
+          </div>
+          <div class="list-toolbar"><span id="itemsCount" class="list-count">0 áudios</span><span class="list-hint">Clique no ▶ para ouvir uma prévia.</span></div>
+          <div id="audioList" class="audio-list" aria-live="polite"></div>
+        </section>
+      </section>
 
-  <dialog id="itemDialog">
-    <form id="itemForm">
-      <div class="dialog-title"><div><p class="eyebrow">BIBLIOTECA</p><h2 id="itemTitle">Novo áudio</h2></div><button id="closeItem" class="close" type="button" aria-label="Fechar">×</button></div>
-      <label>Nome do áudio<input id="itemName" required maxlength="80" placeholder="Ex.: Boas-vindas"></label>
-      <label>Categoria<input id="itemCategory" list="categories" maxlength="40" value="Geral" placeholder="Ex.: Primeiro contato"><datalist id="categories"></datalist></label>
-      <label id="fileRow" class="upload-box"><span class="upload-icon" aria-hidden="true">↑</span><strong>Escolha o arquivo de áudio</strong><small>MP3, M4A, WAV, AAC, OGG, OPUS, MP4 ou WEBM · até 50 MB</small><input id="itemFile" type="file" accept="audio/*,.mp4,.opus,.webm"></label>
-      <div id="selectedFile" class="selected-file" hidden></div>
-      <p id="itemError" class="form-error" role="alert"></p>
-      <button id="saveItem" class="button primary full" type="submit">Salvar áudio</button>
-    </form>
-  </dialog>
+      <section id="categoriesView" class="view" hidden>
+        <section class="content-card categories-card">
+          <div class="section-heading"><div><h2>Categorias</h2><p class="muted">Agrupe os áudios para encontrar tudo com rapidez.</p></div><button id="newCategory" class="primary" type="button">+ Nova categoria</button></div>
+          <div id="categoryList" class="category-list"></div>
+        </section>
+      </section>
+    </main>
+  </div>
 
-  <dialog id="previewDialog">
-    <div class="dialog-title"><div><p class="eyebrow">PRÉVIA</p><h2 id="previewTitle">Ouvir áudio</h2></div><button id="closePreview" class="close" type="button" aria-label="Fechar">×</button></div>
-    <div id="previewBody" class="preview-body"></div>
-  </dialog>
+  <dialog id="audioDialog" class="modal"><form id="audioForm" method="dialog"><div class="modal-heading"><div><p class="eyebrow">BIBLIOTECA</p><h2 id="audioDialogTitle">Novo áudio</h2></div><button id="closeAudio" class="icon-button" type="button" aria-label="Fechar">×</button></div><div class="form-grid"><label class="full">Nome do áudio<input id="audioName" required maxlength="80" placeholder="Boas-vindas"></label><label>Categoria<select id="audioCategory"></select></label><label>Status<select id="audioActive"><option value="true">Ativo na extensão</option><option value="false">Desativado</option></select></label><label class="full file-field">Arquivo de áudio <span>MP3, M4A, WAV, AAC, OGG, OPUS, MP4 ou WEBM · até 50 MB</span><input id="audioFile" type="file" accept="audio/*,.mp4,.opus,.webm"><small id="audioFileHint">O Render converterá o arquivo para mensagem de voz OGG/Opus.</small></label><div class="local-preview full" id="localPreview" hidden><div class="local-preview-heading"><span>Prévia selecionada</span><span id="localDuration"></span></div><audio id="localAudio" controls></audio></div></div><p id="audioError" class="form-error" role="alert"></p><div class="modal-actions"><button id="cancelAudio" class="secondary-button" type="button">Cancelar</button><button id="saveAudio" class="primary" type="submit">Salvar áudio</button></div></form></dialog>
 
+  <dialog id="previewDialog" class="modal preview-modal"><div class="modal-heading"><div><p class="eyebrow">PRÉVIA</p><h2 id="previewTitle">Áudio</h2></div><button id="closePreview" class="icon-button" type="button" aria-label="Fechar">×</button></div><div id="previewContent" class="preview-content"><span class="loader"></span></div></dialog>
+
+  <dialog id="categoryDialog" class="modal small-modal"><form id="categoryForm" method="dialog"><div class="modal-heading"><div><p class="eyebrow">ORGANIZAÇÃO</p><h2 id="categoryDialogTitle">Nova categoria</h2></div><button id="closeCategory" class="icon-button" type="button" aria-label="Fechar">×</button></div><label>Nome da categoria<input id="categoryName" required maxlength="40" placeholder="Boas-vindas"></label><p id="categoryError" class="form-error" role="alert"></p><div class="modal-actions"><button id="cancelCategory" class="secondary-button" type="button">Cancelar</button><button class="primary" type="submit">Salvar categoria</button></div></form></dialog>
+
+  <dialog id="telegramDialog" class="modal small-modal"><form id="telegramForm"><div class="modal-heading"><div><p class="eyebrow">AUTENTICAÇÃO</p><h2>Conta do Telegram</h2></div><button id="closeTelegram" class="icon-button" type="button" aria-label="Fechar">×</button></div><p id="telegramDialogMessage" class="muted">Use a mesma conta que será atendida pela extensão.</p><div id="telegramPhoneStep"><label>Telefone com DDI<input id="telegramPhone" type="tel" placeholder="+5511999999999" autocomplete="tel"></label><button id="startTelegramLogin" class="primary wide" type="button">Receber código</button></div><div id="telegramCodeStep" hidden><label>Código recebido no Telegram<input id="telegramCode" inputmode="numeric" autocomplete="one-time-code"></label><button id="submitTelegramCode" class="primary wide" type="button">Confirmar código</button></div><div id="telegramPasswordStep" hidden><label>Senha de duas etapas<input id="telegramPassword" type="password" autocomplete="off"></label><button id="submitTelegramPassword" class="primary wide" type="button">Conectar conta</button></div><p id="telegramError" class="form-error" role="alert"></p><div class="modal-actions"><button id="cancelTelegram" class="secondary-button" type="button">Fechar</button></div></form></dialog>
+
+  <div id="toast" class="toast" role="status"></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

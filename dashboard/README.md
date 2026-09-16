@@ -1,21 +1,37 @@
-# Dashboard administrativo
+# Dashboard do Telegram Atendimento 4.0
 
-Interface web estática para administrar os áudios usados pela extensão.
+Esta pasta é um site estático. Ela não contém chaves do Supabase nem depende de
+Node.js: o navegador chama a API protegida do Render, e o Render grava os
+metadados no Supabase e os arquivos no bucket privado `ta-media`.
 
-## Publicação no Render
+## Testar localmente
 
-- Tipo: **Static Site**
-- Root Directory: `dashboard`
-- Build Command: deixe vazio
-- Publish Directory: `.`
+Na raiz desta pasta, use qualquer servidor HTTP estático, por exemplo:
 
-Depois da primeira publicação, copie a URL HTTPS do dashboard e adicione-a à
-variável `DASHBOARD_ORIGINS` do serviço backend. Para autorizar mais de um endereço,
-separe-os por vírgulas. Exemplo:
-
-```text
-https://meu-dashboard.onrender.com
+```bash
+python -m http.server 4173
 ```
 
-O dashboard solicita a URL do backend e o `ACCESS_TOKEN`. A chave secreta do
-Supabase continua somente no backend e nunca deve ser informada no navegador.
+Abra `http://localhost:4173`, informe a URL HTTPS do Render e o `ACCESS_TOKEN`.
+O Render precisa aceitar `http://localhost:4173` na variável `DASHBOARD_ORIGINS`.
+
+## Publicar separadamente
+
+No Render, crie um **Static Site** apontando para o mesmo repositório:
+
+- **Root Directory:** `dashboard`
+- **Build Command:** deixe vazio
+- **Publish Directory:** `.`
+
+Depois de o endereço do dashboard ficar disponível, adicione a origem completa,
+sem barra no final, em `DASHBOARD_ORIGINS` no serviço web da API. Para testar
+mais de um endereço, separe as origens por vírgula. Faça um novo deploy da API.
+
+Também é possível publicar esta pasta em qualquer hospedagem de arquivos
+estáticos. O endereço usado precisa ser incluído em `DASHBOARD_ORIGINS`.
+
+## Segurança
+
+O dashboard pede o mesmo `ACCESS_TOKEN` usado pela extensão e o guarda no
+`localStorage` deste navegador. Nunca coloque a chave `SUPABASE_SERVICE_ROLE_KEY`
+em qualquer arquivo desta pasta. O bucket continua privado.

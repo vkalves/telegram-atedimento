@@ -20,4 +20,6 @@ on conflict (id) do update set
   allowed_mime_types = excluded.allowed_mime_types;
 commit;
 -- Não crie políticas públicas para ta_state ou ta-media.
+-- A biblioteca, favoritos, ordem, status e categorias são payloads JSON nessa tabela;
+-- a versão 4.0 não exige tabelas adicionais nem acesso direto do navegador ao Storage.
 -- A chave de servidor fica exclusivamente nas variáveis de ambiente do Render.

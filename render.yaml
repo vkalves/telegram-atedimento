@@ -17,6 +17,8 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: DASHBOARD_ORIGINS
+        sync: false
       - key: TELEGRAM_API_ID
         sync: false
       - key: TELEGRAM_API_HASH
@@ -25,5 +27,3 @@ services:
         generateValue: true
       - key: SESSION_ENCRYPTION_KEY
         generateValue: true
-      - key: DASHBOARD_ORIGINS
-        sync: false

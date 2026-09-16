@@ -4,17 +4,18 @@ import multer from 'multer';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import {Jobs} from './jobs.js';
-export function createApp({telegram,library,sequences,token,extensionIds=[],dashboardOrigins=[]}){
+export function createApp({telegram,library,sequences,categories=null,token,extensionIds=[],dashboardOrigins=[]}){
  if(!token||token.length<32)throw new Error('Configure um ACCESS_TOKEN com pelo menos 32 caracteres.');
  const app=express(),jobs=new Jobs(telegram,library),rates=new Map();
- const allowedDashboards=new Set(dashboardOrigins.map(origin=>String(origin).trim().replace(/\/$/,'')).filter(Boolean));
- const allowed=origin=>!origin||(/^chrome-extension:\/\/[a-p]{32}$/.test(origin)&&(!extensionIds.length||extensionIds.includes(origin.split('://')[1])))||allowedDashboards.has(origin);
+ const dashboardOriginSet=new Set((Array.isArray(dashboardOrigins)?dashboardOrigins:String(dashboardOrigins||'').split(',')).map(origin=>String(origin).trim().replace(/\/$/,'')).filter(Boolean));
+ const localDashboard=/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/;
+ const allowed=origin=>!origin||((/^chrome-extension:\/\/[a-p]{32}$/.test(origin)&&(!extensionIds.length||extensionIds.includes(origin.split('://')[1])))||dashboardOriginSet.has(origin.replace(/\/$/,''))||localDashboard.test(origin));
  app.set('trust proxy',1);app.disable('x-powered-by');
  app.use(cors({origin:(origin,cb)=>cb(null,allowed(origin)),methods:['GET','POST','PATCH','DELETE'],allowedHeaders:['Content-Type','Authorization']}));
  app.use((req,res,next)=>{
   res.set('Cache-Control','no-store');
   if(!allowed(req.get('Origin')))return res.status(403).json({error:'Origem não autorizada.'});
-  if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'3.0.1'});
+  if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'4.0.0',apiVersion:'3.0.1'});
   const supplied=Buffer.from(req.get('Authorization')||''),expected=Buffer.from('Bearer '+token);
   if(supplied.length!==expected.length||!crypto.timingSafeEqual(supplied,expected))return res.status(401).json({error:'Chave de acesso inválida. Confira a conexão nas configurações.'});
   if(req.path.startsWith('/auth/')&&req.method==='POST'){
@@ -30,11 +31,25 @@ export function createApp({telegram,library,sequences,token,extensionIds=[],dash
  app.post('/auth/code',(q,r)=>{if(!q.body.code)throw new Error('Informe o código.');telegram.submitCode(String(q.body.code).trim());r.json({ok:true});});
  app.post('/auth/password',(q,r)=>{if(!q.body.password)throw new Error('Informe a senha.');telegram.submitPassword(String(q.body.password));r.json({ok:true});});
  app.post('/context',async(q,r)=>r.json({target:await telegram.currentTarget(String(q.body.peerKey||''))}));
- app.get('/library',async(_q,r)=>r.json({items:await library.list()}));
- app.post('/library',upload.single('file'),async(q,r)=>{try{r.json({item:await library.add(q.file,q.body)});}finally{if(q.file)await fs.rm(q.file.path,{force:true}).catch(()=>{});}});
- app.patch('/library/:id',async(q,r)=>r.json({item:await library.update(q.params.id,q.body)}));
+ app.get('/library',async(q,r)=>{
+  let items=await library.list();
+  if(q.query.kind)items=items.filter(item=>(item.kind||'voice')===String(q.query.kind));
+  if(q.query.active==='true')items=items.filter(item=>item.active!==false);
+  if(q.query.active==='false')items=items.filter(item=>item.active===false);
+  if(q.query.category)items=items.filter(item=>(item.category||'Geral')===String(q.query.category));
+  if(q.query.search){const search=String(q.query.search).toLocaleLowerCase('pt-BR');items=items.filter(item=>`${item.name} ${item.text||''}`.toLocaleLowerCase('pt-BR').includes(search));}
+  r.json({items});
+ });
+ app.post('/library',upload.single('file'),async(q,r)=>{try{if(categories)await categories.ensure(q.body.category);r.json({item:await library.add(q.file,q.body)});}finally{if(q.file)await fs.rm(q.file.path,{force:true}).catch(()=>{});}});
+ app.patch('/library/reorder',async(q,r)=>r.json({items:await library.reorder(q.body?.ids)}));
+ app.patch('/library/:id',async(q,r)=>{if(categories&&q.body.category!==undefined)await categories.ensure(q.body.category);r.json({item:await library.update(q.params.id,q.body)});});
+ app.post('/library/:id/file',upload.single('file'),async(q,r)=>{try{r.json({item:await library.replaceFile(q.params.id,q.file)});}finally{if(q.file)await fs.rm(q.file.path,{force:true}).catch(()=>{});}});
  app.delete('/library/:id',async(q,r)=>{if([...jobs.jobs.values()].some(j=>j.state==='running'))throw new Error('Aguarde ou pare os envios antes de excluir itens.');r.json({ok:await library.remove(q.params.id)});});
  app.get('/library/:id/preview',async(q,r)=>{const item=await library.get(q.params.id);if(!item?.path)return r.status(404).json({error:'Arquivo não encontrado.'});r.sendFile(item.path);});
+ app.get('/categories',async(_q,r)=>r.json({categories:categories?await categories.list():[]}));
+ app.post('/categories',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({category:await categories.add(q.body)});});
+ app.patch('/categories/:id',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({category:await categories.rename(q.params.id,q.body)});});
+ app.delete('/categories/:id',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({ok:await categories.remove(q.params.id)});});
  app.get('/sequences',async(_q,r)=>r.json({sequences:await sequences.list()}));
  app.post('/sequences',async(q,r)=>r.json({sequence:await sequences.save(q.body)}));
  app.delete('/sequences/:id',async(q,r)=>r.json({ok:await sequences.remove(q.params.id)}));

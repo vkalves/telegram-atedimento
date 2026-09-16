@@ -1,63 +1,293 @@
-const $=id=>document.getElementById(id);
-let connection=JSON.parse(localStorage.getItem('telegramDashboardConnection')||'{}');
-let items=[],editing=null,onlyFavorites=false,previewUrl=null,busy=false;
+const $ = id => document.getElementById(id);
+const connectionStorageKey = 'telegram-atendimento-4-dashboard-connection';
+const state = {connection:null,items:[],categories:[],view:'library',favoriteOnly:false,editingAudio:null,editingCategory:null,localPreviewUrl:null,previewUrl:null,toastTimer:null,loading:false,telegramAuthBusy:false,telegramPoll:null};
 
-function notify(message,type=''){
- const el=$('notice');el.textContent=message;el.className='notice '+type;el.hidden=!message;
+function element(tag, text, className) {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  if (className) node.className = className;
+  return node;
 }
-function setConnected(connected){
- const badge=$('connectionBadge');badge.classList.toggle('offline',!connected);badge.innerHTML=`<i></i> ${connected?'Conectado':'Desconectado'}`;
- $('library').hidden=!connected;$('setupCard').hidden=connected;
-}
-async function request(path,{method='GET',body,blob=false,timeout=30000}={}){
- if(!connection.url||!connection.token)throw new Error('Configure a conexão do dashboard.');
- const headers={Authorization:'Bearer '+connection.token};
- if(body&&!(body instanceof FormData)){headers['Content-Type']='application/json';body=JSON.stringify(body);}
- let response;
- try{response=await fetch(connection.url+path,{method,headers,body,signal:AbortSignal.timeout(timeout)});}
- catch{throw new Error('O backend não respondeu. Confira o endereço, o Render e a autorização do dashboard.');}
- if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||`Erro ${response.status}`);}
- return blob?response.blob():response.json();
-}
-async function boot(){
- if(!connection.url||!connection.token){setConnected(false);return;}
- notify('Conectando ao servidor…','busy');
- try{await request('/health',{timeout:120000});await loadItems();setConnected(true);notify('Biblioteca atualizada.');}
- catch(error){setConnected(false);notify(error.message,'error');}
-}
-async function loadItems(){items=(await request('/library')).items.filter(item=>(item.kind||'voice')==='voice');render();}
-function render(){
- const categories=[...new Set(items.map(item=>item.category||'Geral'))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
- const current=$('category').value;$('category').replaceChildren(new Option('Todas as categorias',''));
- $('categories').replaceChildren();for(const category of categories){$('category').add(new Option(category,category));$('categories').append(new Option(category,category));}
- $('category').value=categories.includes(current)?current:'';
- $('totalCount').textContent=items.length;$('favoriteCount').textContent=items.filter(item=>item.favorite).length;$('categoryCount').textContent=categories.length;
- const query=$('search').value.trim().toLocaleLowerCase('pt-BR'),category=$('category').value;
- const filtered=items.filter(item=>(!query||`${item.name} ${item.category||''}`.toLocaleLowerCase('pt-BR').includes(query))&&(!category||(item.category||'Geral')===category)&&(!onlyFavorites||item.favorite)).sort((a,b)=>Number(!!b.favorite)-Number(!!a.favorite)||a.name.localeCompare(b.name,'pt-BR'));
- $('items').replaceChildren();
- if(!filtered.length){const empty=document.createElement('div');empty.className='empty';empty.innerHTML=`<strong>${items.length?'Nenhum áudio encontrado':'Sua biblioteca está vazia'}</strong><span>${items.length?'Altere os filtros para ver outros resultados.':'Clique em “Novo áudio” para adicionar o primeiro.'}</span>`;$('items').append(empty);return;}
- for(const item of filtered){
-  const card=document.createElement('article');card.className='audio-card';
-  const play=iconButton('▶','Ouvir '+item.name,()=>preview(item));play.className='play';
-  const info=document.createElement('div');info.className='audio-info';const title=document.createElement('h3');title.textContent=(item.favorite?'★ ':'')+item.name;
-  const meta=document.createElement('p');meta.textContent=`${item.category||'Geral'}${item.duration?' · '+formatDuration(item.duration):''}`;info.append(title,meta);
-  const actions=document.createElement('div');actions.className='card-actions';actions.append(iconButton(item.favorite?'★':'☆',item.favorite?'Remover dos favoritos':'Adicionar aos favoritos',()=>favorite(item)),iconButton('✎','Editar '+item.name,()=>openItem(item)),iconButton('⌫','Excluir '+item.name,()=>removeItem(item),'danger'));
-  card.append(play,info,actions);$('items').append(card);
- }
-}
-function iconButton(text,label,action,extra=''){const button=document.createElement('button');button.type='button';button.className='icon-button '+extra;button.textContent=text;button.title=label;button.setAttribute('aria-label',label);button.onclick=action;return button;}
-function formatDuration(seconds){const value=Math.max(0,Number(seconds)||0),minutes=Math.floor(value/60),rest=Math.round(value%60);return minutes?`${minutes}:${String(rest).padStart(2,'0')}`:`${rest}s`;}
-function openSettings(){$('apiUrl').value=connection.url||'';$('accessToken').value=connection.token||'';$('settingsError').textContent='';$('settingsDialog').showModal();}
-function openItem(item=null){editing=item;$('itemTitle').textContent=item?'Editar áudio':'Novo áudio';$('itemName').value=item?.name||'';$('itemCategory').value=item?.category||'Geral';$('itemFile').value='';$('fileRow').hidden=!!item;$('selectedFile').hidden=true;$('itemError').textContent='';$('saveItem').textContent=item?'Salvar alterações':'Salvar áudio';$('itemDialog').showModal();}
-async function favorite(item){try{await request('/library/'+item.id,{method:'PATCH',body:{favorite:!item.favorite}});await loadItems();notify(item.favorite?'Removido dos favoritos.':'Adicionado aos favoritos.');}catch(error){notify(error.message,'error');}}
-async function removeItem(item){if(!confirm(`Excluir o áudio “${item.name}”? Esta ação não pode ser desfeita.`))return;try{await request('/library/'+item.id,{method:'DELETE'});await loadItems();notify('Áudio excluído.');}catch(error){notify(error.message,'error');}}
-async function preview(item){$('previewTitle').textContent=item.name;$('previewBody').innerHTML='<p class="loading">Carregando áudio…</p>';$('previewDialog').showModal();try{const blob=await request('/library/'+item.id+'/preview',{blob:true});previewUrl=URL.createObjectURL(blob);const audio=document.createElement('audio');audio.controls=true;audio.autoplay=true;audio.src=previewUrl;$('previewBody').replaceChildren(audio);}catch(error){$('previewBody').textContent=error.message;}}
-function closePreview(){$('previewBody').querySelector('audio')?.pause();$('previewDialog').close();if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=null;}
 
-$('settingsForm').onsubmit=async event=>{event.preventDefault();const submit=$('saveSettings');submit.disabled=true;$('settingsError').textContent='';try{const url=new URL($('apiUrl').value.trim()),token=$('accessToken').value.trim();if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw new Error('Use a URL HTTPS do Render sem caminho no final.');if(token.length<32)throw new Error('Confira o ACCESS_TOKEN completo.');connection={url:url.origin,token};localStorage.setItem('telegramDashboardConnection',JSON.stringify(connection));$('settingsDialog').close();await boot();}catch(error){$('settingsError').textContent=error.message;}finally{submit.disabled=false;}};
-$('itemForm').onsubmit=async event=>{event.preventDefault();if(busy)return;busy=true;const submit=$('saveItem');submit.disabled=true;$('itemError').textContent='';try{const name=$('itemName').value.trim(),category=$('itemCategory').value.trim()||'Geral';if(editing)await request('/library/'+editing.id,{method:'PATCH',body:{name,category}});else{const file=$('itemFile').files[0];if(!file)throw new Error('Selecione um arquivo de áudio.');if(file.size>50*1024*1024)throw new Error('O arquivo excede 50 MB.');const form=new FormData();form.append('kind','voice');form.append('name',name);form.append('category',category);form.append('file',file);notify('Enviando e convertendo o áudio…','busy');await request('/library',{method:'POST',body:form,timeout:300000});}$('itemDialog').close();await loadItems();notify(editing?'Áudio atualizado.':'Áudio salvo e disponível na extensão.');}catch(error){$('itemError').textContent=error.message;notify(error.message,'error');}finally{busy=false;submit.disabled=false;}};
-$('itemFile').onchange=()=>{const file=$('itemFile').files[0];$('selectedFile').hidden=!file;$('selectedFile').textContent=file?`${file.name} · ${(file.size/1024/1024).toFixed(1)} MB`:'';};
-$('search').oninput=render;$('category').onchange=render;$('favorites').onclick=()=>{onlyFavorites=!onlyFavorites;$('favorites').classList.toggle('active',onlyFavorites);render();};
-$('reload').onclick=async()=>{try{notify('Atualizando…','busy');await loadItems();notify('Biblioteca atualizada.');}catch(error){notify(error.message,'error');}};
-$('newItem').onclick=()=>openItem();$('openSettings').onclick=openSettings;$('setupButton').onclick=openSettings;$('closeSettings').onclick=()=>$('settingsDialog').close();$('closeItem').onclick=()=>$('itemDialog').close();$('closePreview').onclick=closePreview;$('previewDialog').addEventListener('close',()=>{if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}});
-await boot();
+function button(text, onClick, className = 'secondary-button') {
+  const node = element('button', text, className);node.type='button';node.addEventListener('click',onClick);return node;
+}
+
+function showToast(text, type = '') {
+  const toast=$('toast');toast.textContent=text;toast.className=`toast show ${type}`.trim();clearTimeout(state.toastTimer);state.toastTimer=setTimeout(()=>toast.className='toast',4500);
+}
+
+function showConnectionGate(error = '') {
+  $('appShell').hidden=true;$('connectionGate').hidden=false;
+  $('connectionUrl').value=state.connection?.url || $('connectionUrl').value || '';
+  $('connectionToken').value=state.connection?.token || $('connectionToken').value || '';
+  $('connectionError').textContent=error;
+}
+
+function showApp() {
+  $('connectionGate').hidden=true;$('appShell').hidden=false;
+  $('connectedUrl').textContent=state.connection?.url || '—';
+}
+
+function normalizeUrl(value) {
+  const url=new URL(value.trim());
+  if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw new Error('Use um endereço HTTPS sem caminho, por exemplo https://telegram-atendimento.onrender.com');
+  return url.origin;
+}
+
+async function requestWithConnection(connection,path,options={}) {
+  const headers={Authorization:`Bearer ${connection.token}`};
+  let body=options.body;
+  if(body!==undefined && !(body instanceof FormData)){headers['Content-Type']='application/json';body=JSON.stringify(body);}
+  let response;
+  try{response=await fetch(new URL(path,connection.url),{method:options.method||'GET',headers,body,signal:AbortSignal.timeout(options.timeout||30000)});}catch{throw new Error('A API não respondeu. Confira o Render e a internet.');}
+  if(options.blob){if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||`Erro ${response.status}`);}return response.blob();}
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||`Erro ${response.status}`);
+  return data;
+}
+
+async function api(path, options={}) {
+  if(!state.connection)throw new Error('Conecte o dashboard à API do Render.');
+  return requestWithConnection(state.connection,path,options);
+}
+
+async function loadData() {
+  if(!state.connection||state.loading)return;
+  state.loading=true;
+  try{
+    const [libraryData,categoryData]=await Promise.all([api('/library'),api('/categories')]);
+    state.items=(libraryData.items||[]).filter(item=>(item.kind||'voice')==='voice');
+    state.categories=(categoryData.categories||[]).filter(item=>item?.id&&item?.name);
+    if(!state.categories.some(item=>item.name==='Geral'))state.categories.unshift({id:'',name:'Geral'});
+    render();
+  }finally{state.loading=false;}
+}
+
+function formatDuration(value) {
+  const total=Math.max(0,Math.round(Number(value)||0));
+  const minutes=Math.floor(total/60),seconds=String(total%60).padStart(2,'0');
+  return `${minutes}:${seconds}`;
+}
+
+function categoryName(item) {return item.category || 'Geral';}
+
+function filteredItems() {
+  const query=$('search').value.trim().toLocaleLowerCase('pt-BR'),category=$('categoryFilter').value,status=$('statusFilter').value;
+  return state.items.filter(item=>
+    (!query||String(item.name||'').toLocaleLowerCase('pt-BR').includes(query))&&
+    (!category||categoryName(item)===category)&&
+    (!status||(status==='active'?item.active!==false:item.active===false))&&
+    (!state.favoriteOnly||item.favorite===true)
+  );
+}
+
+function renderStats() {
+  $('totalCount').textContent=state.items.length;
+  $('activeCount').textContent=state.items.filter(item=>item.active!==false).length;
+  $('favoriteCount').textContent=state.items.filter(item=>item.favorite===true).length;
+  $('categoryCount').textContent=state.categories.length;
+  $('navAudioCount').textContent=state.items.length;
+}
+
+function renderCategoryOptions() {
+  const filterValue=$('categoryFilter').value, audioValue=$('audioCategory').value;
+  $('categoryFilter').replaceChildren(new Option('Todas as categorias',''));
+  $('audioCategory').replaceChildren();
+  for(const category of state.categories){
+    $('categoryFilter').add(new Option(category.name,category.name));
+    $('audioCategory').add(new Option(category.name,category.name));
+  }
+  $('categoryFilter').value=state.categories.some(item=>item.name===filterValue)?filterValue:'';
+  $('audioCategory').value=state.categories.some(item=>item.name===audioValue)?audioValue:'Geral';
+}
+
+function render() {
+  renderStats();renderCategoryOptions();renderAudioList();renderCategories();
+  $('favoriteFilter').classList.toggle('active',state.favoriteOnly);
+  const hasFilter=$('search').value||$('categoryFilter').value||$('statusFilter').value||state.favoriteOnly;
+  $('clearFilters').hidden=!hasFilter;
+}
+
+function renderTelegramStatus(status, error = '') {
+  const dot=$('telegramStatusDot'),title=$('telegramStatusText'),account=$('telegramAccountText'),connect=$('connectTelegram');
+  if(status?.authorized){
+    dot.className='telegram-dot online';title.textContent='Telegram conectado';account.textContent=`${status.me?.name || 'Conta Telegram'}${status.me?.username?' · @'+status.me.username:''}`;connect.textContent='Ver conta';return;
+  }
+  if(status?.state==='starting'||status?.state==='need_code'||status?.state==='need_password'){
+    dot.className='telegram-dot loading';title.textContent='Conectando Telegram…';account.textContent=status.state==='need_code'?'Aguardando código':status.state==='need_password'?'Aguardando senha 2FA':'Processando login';connect.textContent='Continuar login';return;
+  }
+  dot.className=`telegram-dot ${error||status?.lastError?'error':''}`.trim();title.textContent='Telegram não conectado';account.textContent=error||status?.lastError||'Conecte a conta para enviar vozes';connect.textContent='Conectar conta';
+}
+
+function setTelegramSteps(status) {
+  const stateName=status?.state||'idle',authorized=!!status?.authorized;
+  $('telegramPhoneStep').hidden=authorized||!['idle','error'].includes(stateName);
+  $('telegramCodeStep').hidden=authorized||stateName!=='need_code';
+  $('telegramPasswordStep').hidden=authorized||stateName!=='need_password';
+  if(authorized) $('telegramDialogMessage').textContent=`Conectado como ${status.me?.name || 'Conta Telegram'}.`;
+  else if(status?.lastError) $('telegramDialogMessage').textContent=status.lastError;
+  else if(stateName==='need_code') $('telegramDialogMessage').textContent='Digite o código que o Telegram enviou para sua conta.';
+  else if(stateName==='need_password') $('telegramDialogMessage').textContent='Digite a senha de verificação em duas etapas.';
+  else if(stateName==='starting') $('telegramDialogMessage').textContent='Iniciando a conexão… aguarde.';
+  else $('telegramDialogMessage').textContent='Use a mesma conta que será atendida pela extensão.';
+}
+
+async function loadTelegramStatus(showError = false) {
+  try{const status=await api('/auth/status');renderTelegramStatus(status);setTelegramSteps(status);return status;}
+  catch(error){renderTelegramStatus(null,error.message);if(showError)$('telegramError').textContent=error.message;return null;}
+}
+
+async function telegramAction(path, body, buttonId) {
+  if(state.telegramAuthBusy)return;state.telegramAuthBusy=true;const action=$(buttonId);action.disabled=true;$('telegramError').textContent='';
+  try{await api(path,{method:'POST',body});await loadTelegramStatus(true);}
+  catch(error){$('telegramError').textContent=error.message;}
+  finally{state.telegramAuthBusy=false;action.disabled=false;}
+}
+
+function openTelegramDialog() {
+  $('telegramError').textContent='';$('telegramDialog').showModal();void loadTelegramStatus(true);clearInterval(state.telegramPoll);state.telegramPoll=setInterval(()=>{if($('telegramDialog').open&&!state.telegramAuthBusy)void loadTelegramStatus(true);},1000);
+}
+
+function renderAudioList() {
+  const list=$('audioList');list.replaceChildren();
+  const items=filteredItems();
+  $('itemsCount').textContent=`${items.length} ${items.length===1?'áudio':'áudios'}`;
+  const canReorder=!$('search').value&&!$('categoryFilter').value&&!$('statusFilter').value&&!state.favoriteOnly;
+  $('listDescription').textContent=canReorder?'Arraste para alterar a ordem exibida na barra do Telegram.':'Limpe os filtros para reorganizar a biblioteca.';
+  if(!items.length){
+    const empty=element('div',undefined,'empty-state');empty.append(element('strong',state.items.length?'Nenhum áudio encontrado':'Sua biblioteca está vazia'),element('p',state.items.length?'Tente ajustar os filtros.':'Adicione seu primeiro áudio para começar.'),button('+ Novo áudio',()=>openAudioDialog(),'primary'));list.append(empty);return;
+  }
+  for(const item of items){
+    const row=element('article',undefined,'audio-row'+(item.active===false?' inactive':''));row.dataset.id=item.id;row.draggable=canReorder;
+    const drag=element('span','⠿','drag-handle');drag.title=canReorder?'Arraste para reordenar':'Limpe os filtros para reordenar';
+    const play=button('▶',()=>openPreview(item),'play-button');play.title=`Ouvir prévia de ${item.name}`;play.setAttribute('aria-label',`Ouvir prévia de ${item.name}`);
+    const info=element('div',undefined,'audio-info');info.append(element('strong',item.name,'audio-name'));
+    const meta=element('div',undefined,'audio-meta');meta.append(element('span',categoryName(item),'category-pill'),element('span',item.active===false?'Desativado':'Ativo','status-pill '+(item.active===false?'inactive':'active')));info.append(meta);
+    const duration=element('span',formatDuration(item.duration),'row-duration');duration.title='Duração';
+    const favorite=button(item.favorite?'★':'☆',()=>toggleItem(item,'favorite',!item.favorite),'row-favorite '+(item.favorite?'active':''));favorite.title=item.favorite?'Remover dos favoritos':'Marcar como favorito';favorite.setAttribute('aria-label',favorite.title);
+    const activeLabel=element('label',undefined,'switch');const activeInput=document.createElement('input');activeInput.type='checkbox';activeInput.checked=item.active!==false;activeInput.setAttribute('aria-label',`${item.active===false?'Ativar':'Desativar'} ${item.name}`);activeInput.addEventListener('change',()=>toggleItem(item,'active',activeInput.checked));const track=element('span',undefined,'switch-track');activeLabel.append(activeInput,track);
+    const menu=element('details','', 'row-menu');const summary=element('summary','⋯','menu-button');summary.setAttribute('aria-label',`Ações para ${item.name}`);const actions=element('div',undefined,'row-actions');
+    actions.append(button('Editar',()=>{menu.open=false;openAudioDialog(item)}),button('Substituir arquivo',()=>{menu.open=false;openAudioDialog(item,true)}),button('Excluir',()=>{menu.open=false;deleteAudio(item)},'danger'));menu.append(summary,actions);
+    row.append(drag,play,info,duration,favorite,activeLabel,menu);
+    row.addEventListener('dragstart',event=>{if(!canReorder){event.preventDefault();return;}row.classList.add('dragging');event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',item.id);});
+    row.addEventListener('dragend',()=>row.classList.remove('dragging'));
+    row.addEventListener('dragover',event=>{if(canReorder)event.preventDefault();});
+    row.addEventListener('drop',event=>{event.preventDefault();if(canReorder)reorderAudio(event.dataTransfer.getData('text/plain'),item.id);});
+    list.append(row);
+  }
+}
+
+function renderCategories() {
+  const list=$('categoryList');list.replaceChildren();
+  for(const category of state.categories){
+    const count=state.items.filter(item=>categoryName(item)===category.name).length,row=element('div',undefined,'category-row');
+    row.append(element('span','▤','category-symbol'));
+    const main=element('div',undefined,'category-main');main.append(element('strong',category.name),element('span',`${count} ${count===1?'áudio':'áudios'}`));row.append(main);
+    const actions=element('div',undefined,'category-actions');const rename=button('Renomear',()=>openCategoryDialog(category));const remove=button('Excluir',()=>deleteCategory(category),'danger');if(category.name==='Geral'){rename.disabled=true;remove.disabled=true;}actions.append(rename,remove);row.append(actions);list.append(row);
+  }
+  if(!state.categories.length)list.append(element('div','Nenhuma categoria criada.','empty-state'));
+}
+
+async function toggleItem(item,field,value) {
+  try{await api(`/library/${encodeURIComponent(item.id)}`,{method:'PATCH',body:{[field]:value}});await loadData();showToast(field==='active'?(value?'Áudio ativado na extensão.':'Áudio desativado na extensão.'):'Favorito atualizado.');}
+  catch(error){showToast(error.message,'error');render();}
+}
+
+async function reorderAudio(fromId,toId) {
+  if(!fromId||fromId===toId)return;
+  const from=state.items.findIndex(item=>item.id===fromId),to=state.items.findIndex(item=>item.id===toId);if(from<0||to<0)return;
+  const [moved]=state.items.splice(from,1);state.items.splice(to,0,moved);renderAudioList();
+  try{await api('/library/reorder',{method:'PATCH',body:{ids:state.items.map(item=>item.id)}});showToast('Ordem dos áudios atualizada.');}
+  catch(error){showToast(error.message,'error');await loadData();}
+}
+
+async function deleteAudio(item) {
+  if(!confirm(`Excluir “${item.name}”? Essa ação remove o arquivo do Storage.`))return;
+  try{await api(`/library/${encodeURIComponent(item.id)}`,{method:'DELETE'});await loadData();showToast('Áudio excluído.');}
+  catch(error){showToast(error.message,'error');}
+}
+
+function clearLocalPreview() {
+  if(state.localPreviewUrl)URL.revokeObjectURL(state.localPreviewUrl);state.localPreviewUrl=null;$('localAudio').removeAttribute('src');$('localAudio').load();$('localDuration').textContent='';$('localPreview').hidden=true;
+}
+
+function openAudioDialog(item=null,replace=false) {
+  state.editingAudio=item||null;clearLocalPreview();$('audioDialogTitle').textContent=item?'Editar áudio':'Novo áudio';$('audioName').value=item?.name||'';$('audioCategory').value=item?categoryName(item):'Geral';$('audioActive').value=item?.active===false?'false':'true';$('audioFile').value='';$('audioFile').required=!item;$('audioFileHint').textContent=item?'Opcional: escolha um novo arquivo para substituir o atual.':'O Render converterá o arquivo para mensagem de voz OGG/Opus.';$('audioError').textContent='';$('audioDialog').showModal();if(replace)$('audioFile').focus();
+}
+
+async function saveAudio(event) {
+  event.preventDefault();const save=$('saveAudio');save.disabled=true;$('audioError').textContent='';
+  const file=$('audioFile').files[0],name=$('audioName').value.trim(),category=$('audioCategory').value||'Geral',active=$('audioActive').value==='true';
+  try{
+    if(!name)throw new Error('Informe um nome para o áudio.');
+    if(file&&file.size>50*1024*1024)throw new Error('O arquivo excede 50 MB.');
+    if(!state.editingAudio&&!file)throw new Error('Selecione um arquivo de áudio.');
+    if(state.editingAudio){
+      await api(`/library/${encodeURIComponent(state.editingAudio.id)}`,{method:'PATCH',body:{name,category,active}});
+      if(file){const form=new FormData();form.append('file',file);await api(`/library/${encodeURIComponent(state.editingAudio.id)}/file`,{method:'POST',body:form,timeout:300000});}
+    }else{
+      const form=new FormData();form.append('name',name);form.append('category',category);form.append('kind','voice');form.append('active',String(active));form.append('file',file);await api('/library',{method:'POST',body:form,timeout:300000});
+    }
+    $('audioDialog').close();await loadData();showToast(state.editingAudio?'Áudio atualizado.':'Áudio adicionado à biblioteca.');
+  }catch(error){$('audioError').textContent=error.message;}
+  finally{save.disabled=false;}
+}
+
+async function openPreview(item) {
+  if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);state.previewUrl=null;$('previewTitle').textContent=item.name;$('previewContent').replaceChildren(element('span',undefined,'loader'));$('previewDialog').showModal();
+  try{const blob=await api(`/library/${encodeURIComponent(item.id)}/preview`,{blob:true,timeout:120000});if(!$('previewDialog').open)return;state.previewUrl=URL.createObjectURL(blob);const audio=document.createElement('audio');audio.controls=true;audio.autoplay=false;audio.src=state.previewUrl;$('previewContent').replaceChildren(audio);}
+  catch(error){$('previewContent').replaceChildren(element('p',error.message,'form-error'));}
+}
+
+function closePreview() {if(state.previewUrl)URL.revokeObjectURL(state.previewUrl);state.previewUrl=null;$('previewContent').replaceChildren();}
+
+function openCategoryDialog(category=null) {state.editingCategory=category||null;$('categoryDialogTitle').textContent=category?'Renomear categoria':'Nova categoria';$('categoryName').value=category?.name||'';$('categoryError').textContent='';$('categoryDialog').showModal();}
+
+async function saveCategory(event) {
+  event.preventDefault();const name=$('categoryName').value.trim();$('categoryError').textContent='';
+  try{if(!name)throw new Error('Informe um nome.');if(state.editingCategory)await api(`/categories/${encodeURIComponent(state.editingCategory.id)}`,{method:'PATCH',body:{name}});else await api('/categories',{method:'POST',body:{name}});$('categoryDialog').close();await loadData();showToast(state.editingCategory?'Categoria renomeada.':'Categoria criada.');}
+  catch(error){$('categoryError').textContent=error.message;}
+}
+
+async function deleteCategory(category) {
+  if(category.name==='Geral')return;
+  if(!confirm(`Excluir a categoria “${category.name}”? Os áudios serão movidos para Geral.`))return;
+  try{await api(`/categories/${encodeURIComponent(category.id)}`,{method:'DELETE'});await loadData();showToast('Categoria excluída; os áudios foram movidos para Geral.');}
+  catch(error){showToast(error.message,'error');}
+}
+
+function setView(view) {
+  state.view=view;$('libraryView').hidden=view!=='library';$('categoriesView').hidden=view!=='categories';$('pageTitle').textContent=view==='library'?'Organize seu atendimento':'Categorias da biblioteca';
+  document.querySelectorAll('.nav-item').forEach(item=>item.classList.toggle('active',item.dataset.view===view));$('sidebar').classList.remove('open');
+}
+
+async function connect(event) {
+  event.preventDefault();const submit=event.currentTarget.querySelector('button[type="submit"]');submit.disabled=true;$('connectionError').textContent='';
+  try{const url=normalizeUrl($('connectionUrl').value),token=$('connectionToken').value.trim();if(token.length<32)throw new Error('Confira a chave de acesso completa.');const connection={url,token};const health=await requestWithConnection(connection,'/health',{timeout:120000});if(!health.ok)throw new Error('A API não confirmou a conexão.');state.connection=connection;localStorage.setItem(connectionStorageKey,JSON.stringify(connection));showApp();await loadData();await loadTelegramStatus();showToast('Dashboard conectado.');}
+  catch(error){$('connectionError').textContent=error.message;showConnectionGate(error.message);}
+  finally{submit.disabled=false;}
+}
+
+async function start() {
+  try{state.connection=JSON.parse(localStorage.getItem(connectionStorageKey)||'null');}catch{state.connection=null;}
+  if(!state.connection){showConnectionGate();return;}
+  $('connectionUrl').value=state.connection.url||'';$('connectionToken').value=state.connection.token||'';showApp();
+  try{await loadData();await loadTelegramStatus();}catch(error){showConnectionGate(error.message);}
+}
+
+$('connectionForm').addEventListener('submit',connect);
+$('audioForm').addEventListener('submit',saveAudio);
+$('categoryForm').addEventListener('submit',saveCategory);
+$('newAudio').addEventListener('click',()=>openAudioDialog());$('cancelAudio').addEventListener('click',()=>$('audioDialog').close());$('closeAudio').addEventListener('click',()=>$('audioDialog').close());$('audioDialog').addEventListener('close',clearLocalPreview);
+$('closePreview').addEventListener('click',()=>$('previewDialog').close());$('previewDialog').addEventListener('close',closePreview);
+$('newCategory').addEventListener('click',()=>openCategoryDialog());$('cancelCategory').addEventListener('click',()=>$('categoryDialog').close());$('closeCategory').addEventListener('click',()=>$('categoryDialog').close());
+$('connectTelegram').addEventListener('click',openTelegramDialog);$('startTelegramLogin').addEventListener('click',()=>telegramAction('/auth/start',{phone:$('telegramPhone').value},'startTelegramLogin'));$('submitTelegramCode').addEventListener('click',()=>telegramAction('/auth/code',{code:$('telegramCode').value},'submitTelegramCode'));$('submitTelegramPassword').addEventListener('click',()=>telegramAction('/auth/password',{password:$('telegramPassword').value},'submitTelegramPassword'));$('cancelTelegram').addEventListener('click',()=>$('telegramDialog').close());$('closeTelegram').addEventListener('click',()=>$('telegramDialog').close());$('telegramForm').addEventListener('submit',event=>event.preventDefault());$('telegramDialog').addEventListener('close',()=>{clearInterval(state.telegramPoll);state.telegramPoll=null;});
+$('audioFile').addEventListener('change',()=>{const file=$('audioFile').files[0];clearLocalPreview();$('audioError').textContent='';if(!file)return;if(file.size>50*1024*1024){$('audioError').textContent='O arquivo excede 50 MB.';return;}state.localPreviewUrl=URL.createObjectURL(file);$('localAudio').src=state.localPreviewUrl;$('localAudio').onloadedmetadata=()=>{$('localDuration').textContent=formatDuration($('localAudio').duration);};$('localPreview').hidden=false;});
+$('search').addEventListener('input',renderAudioList);$('categoryFilter').addEventListener('change',renderAudioList);$('statusFilter').addEventListener('change',renderAudioList);$('favoriteFilter').addEventListener('click',()=>{state.favoriteOnly=!state.favoriteOnly;render();});$('clearFilters').addEventListener('click',()=>{$('search').value='';$('categoryFilter').value='';$('statusFilter').value='';state.favoriteOnly=false;render();});
+$('refresh').addEventListener('click',async()=>{try{await loadData();showToast('Biblioteca atualizada.');}catch(error){showToast(error.message,'error');}});
+$('disconnect').addEventListener('click',()=>{localStorage.removeItem(connectionStorageKey);state.connection=null;showConnectionGate();});
+$('openSidebar').addEventListener('click',()=>$('sidebar').classList.add('open'));$('closeSidebar').addEventListener('click',()=>$('sidebar').classList.remove('open'));
+document.querySelectorAll('.nav-item').forEach(item=>item.addEventListener('click',()=>setView(item.dataset.view)));
+setInterval(()=>{if(!$('appShell').hidden&&!state.loading)loadData().catch(()=>{});},30000);
+start();

@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {TelegramService} from './telegram.js';
 import {VoiceLibrary} from './library.js';
 import {Sequences} from './sequences.js';
+import {CategoryStore} from './categories.js';
 import {createApp} from './app.js';
 import {SupabaseStore} from './supabase-store.js';
 const dataDir=path.resolve(process.env.DATA_DIR||'./data'),port=Number(process.env.PORT||8080);
@@ -15,15 +16,11 @@ if(!/^\d+$/.test(apiId||'')||!/^[a-f\d]{32}$/i.test(apiHash||'')||!token||token.
 }
 if(!process.env.SUPABASE_URL||!process.env.SUPABASE_SERVICE_ROLE_KEY){console.error('Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no Render.');process.exit(1);}
 const store=new SupabaseStore({url:process.env.SUPABASE_URL,key:process.env.SUPABASE_SERVICE_ROLE_KEY});
-const telegram=new TelegramService({apiId,apiHash,dataDir,encryptionKey:encryptionHex,store}),library=new VoiceLibrary(dataDir,store),sequences=new Sequences(dataDir,store);
+const telegram=new TelegramService({apiId,apiHash,dataDir,encryptionKey:encryptionHex,store}),library=new VoiceLibrary(dataDir,store),sequences=new Sequences(dataDir,store),categories=new CategoryStore(dataDir,store,library);
 try{
- await library.init();await sequences.init();await telegram.init();
- const app=createApp({
-  telegram,library,sequences,token,
-  extensionIds:(process.env.EXTENSION_IDS||'').split(',').map(s=>s.trim()).filter(Boolean),
-  dashboardOrigins:(process.env.DASHBOARD_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean)
- });
- const server=app.listen(port,'0.0.0.0',()=>console.log(`Telegram Atendimento 3.0 online na porta ${port}`));
+ await library.init();await sequences.init();await categories.init();await telegram.init();
+ const app=createApp({telegram,library,sequences,categories,token,extensionIds:(process.env.EXTENSION_IDS||'').split(',').map(s=>s.trim()).filter(Boolean),dashboardOrigins:(process.env.DASHBOARD_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean)});
+ const server=app.listen(port,'0.0.0.0',()=>console.log(`Telegram Atendimento 4.0 online na porta ${port}`));
  server.on('error',e=>{console.error(e.message);process.exit(1);});
  process.on('SIGTERM',()=>server.close(()=>process.exit(0)));
 }catch(e){console.error(telegram.friendlyError(e));process.exit(1);}

@@ -1,158 +1,124 @@
-# Instalar pelos painéis: Supabase, GitHub e Render
+# Telegram Atendimento 4.0
 
-Versão 3.0.1. Este pacote ainda precisa ser publicado. A arquitetura é uma instalação
-privada para uma conta de Telegram, sem cadastro de clientes ou cobrança.
+O projeto agora possui duas interfaces separadas:
 
-## 1. Preparar o Supabase
+- **Dashboard:** administra a biblioteca de áudios.
+- **Extensão Chrome:** mostra somente uma barra compacta acima do campo de mensagem do Telegram Web e envia o áudio para a conversa aberta.
 
-1. Crie um projeto dedicado no plano **Free** em [Supabase](https://supabase.com/dashboard).
-2. No projeto, abra **SQL Editor**, crie uma consulta, cole o conteúdo completo de
-   `supabase/CONFIGURAR.sql` e execute **Run**.
-3. Confira que foi criado o bucket privado `ta-media` em Storage. Não o torne público.
-4. Nas configurações do projeto, copie o **Project URL**.
-5. Na seção **API Keys**, localize uma chave secreta de servidor. O adaptador aceita
-   a chave `sb_secret_...` ou a antiga `service_role` em Legacy API Keys.
-   Não use `anon` ou `publishable`. Guarde a chave para colar somente no Render.
+O Render continua sendo a API e o responsável por autenticar a conta do
+Telegram, converter os arquivos para OGG/Opus e enviar a mensagem de voz. O
+Supabase guarda os metadados e o Storage privado.
 
-O nome da variável no Render é `SUPABASE_SERVICE_ROLE_KEY`, inclusive se usar uma
-chave nova `sb_secret_...`. A extensão não recebe essa chave.
+## 1. Configurar o Supabase
 
-## 2. Enviar o projeto ao GitHub
+1. Crie um projeto no plano Free.
+2. Abra **SQL Editor**, crie uma consulta e execute o conteúdo completo de
+   `supabase/CONFIGURAR.sql`.
+3. Em **Storage**, confirme o bucket privado `ta-media`.
+4. Em **Project Settings → API**, copie o **Project URL** e uma chave secreta de
+   servidor (`sb_secret_...` ou `service_role` em Legacy API Keys).
 
-1. No GitHub, crie um repositório **Private** chamado `telegram-atendimento`.
-2. Extraia este ZIP no computador e abra a pasta `telegram-render-supabase`.
-3. No repositório, escolha **Add file → Upload files** (ou o link de enviar arquivos
-   que aparece em um repositório vazio).
-4. Arraste o conteúdo dessa pasta para a página: `server`, `extension`, `supabase`,
-   `render.yaml` e os demais arquivos. Não envie o ZIP fechado.
-5. Confirme **Commit changes**.
-6. Confira que `render.yaml` aparece diretamente na página inicial do repositório,
-   junto das pastas `server` e `extension`. Não deve estar dentro de uma pasta extra.
+Não use a chave `anon`/`publishable` no Render para esta instalação e nunca
+coloque a chave secreta em `dashboard/`, `extension/` ou no GitHub.
 
-O pacote não contém credenciais, node_modules, arquivos .env, sessões ou áudios pessoais.
-Se você tiver criado arquivos com segredos, não os envie ao GitHub.
+## 2. Publicar a API no Render
 
-## 3. Publicar no Render
+1. Envie o conteúdo deste repositório ao GitHub, mantendo `render.yaml`,
+   `server`, `extension`, `dashboard` e `supabase` na raiz.
+2. No Render, escolha **New → Blueprint** e selecione o repositório.
+3. Preencha as variáveis solicitadas:
 
-1. Acesse [Render](https://dashboard.render.com/) e conecte sua conta do GitHub.
-2. Selecione **New → Blueprint** e escolha o repositório privado acima.
-3. O Render vai ler `render.yaml`. Confira o plano **Free** e apenas um serviço web.
-4. Preencha os campos solicitados:
-
-| Campo no Render | O que colocar |
+| Variável | Valor |
 |---|---|
-| `SUPABASE_URL` | Project URL do Supabase, começando por HTTPS |
-| `SUPABASE_SERVICE_ROLE_KEY` | Chave secreta de servidor do Supabase |
-| `TELEGRAM_API_ID` | API ID da aplicação em my.telegram.org |
-| `TELEGRAM_API_HASH` | API Hash da mesma aplicação |
+| `SUPABASE_URL` | Project URL HTTPS do Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Chave secreta do Supabase |
+| `TELEGRAM_API_ID` | API ID de `my.telegram.org` |
+| `TELEGRAM_API_HASH` | API Hash de `my.telegram.org` |
+| `DASHBOARD_ORIGINS` | URL do dashboard; pode preencher depois |
 
-5. O Blueprint gera `ACCESS_TOKEN` e `SESSION_ENCRYPTION_KEY` automaticamente.
-   Mantenha esses valores estáveis entre publicações.
-6. Confirme a criação e aguarde o build terminar. Ele instala as dependências e FFmpeg.
-7. Quando aparecer **Live**, copie o endereço HTTPS exibido pelo Render.
-8. Na aba **Environment**, localize o `ACCESS_TOKEN` gerado. Esse é o único segredo
-   do servidor que você precisará informar na extensão.
+O Blueprint gera `ACCESS_TOKEN` e `SESSION_ENCRYPTION_KEY`. Não troque esses
+valores entre deploys: a sessão Telegram é cifrada com o segundo segredo, e o
+ACCESS_TOKEN é usado pelo dashboard e pela extensão.
 
-Não crie banco Postgres do Render, disco pago ou serviço adicional. O armazenamento
-permanente desta versão fica no Supabase. O endereço HTTPS do Render elimina a
-necessidade de DuckDNS, domínio próprio ou Caddy.
+Depois que o serviço ficar **Live**, copie a URL HTTPS da API. O Render Free
+pode dormir após inatividade; o primeiro acesso pode levar algum tempo.
 
-## 4. Instalar e conectar a extensão
+## 3. Publicar o dashboard separadamente
 
-1. No Chrome, abra `chrome://extensions`, ative **Modo do desenvolvedor** e clique
-   em **Carregar sem compactação**.
-2. Selecione a pasta `extension` deste pacote. Desative as versões anteriores para
-   o teste não misturar painéis. Se atualizar uma instalação existente, mantenha
-   um backup antes de substituir seus arquivos.
-3. Clique no ícone da extensão **Telegram Atendimento 3.1** na barra do Chrome.
-4. Na janela de configuração, preencha:
+No Render, crie um **Static Site** apontando para o mesmo repositório:
 
-| Campo na extensão | O que colocar |
-|---|---|
-| Endereço da sua instalação | URL HTTPS fornecida pelo Render, sem caminho no final |
-| Chave de acesso | `ACCESS_TOKEN` do Render |
+- **Root Directory:** `dashboard`
+- **Build Command:** vazio
+- **Publish Directory:** `.`
 
-5. Clique em **Salvar conexão** e autorize acesso ao endereço informado.
-6. Conecte a mesma conta do Telegram aberta na aba. Digite telefone, código e senha
-   de duas etapas, quando solicitados, diretamente no painel.
-7. Abra ou atualize o Telegram Web. Os áudios cadastrados no dashboard aparecem
-   em uma barra acima do campo de mensagem. Abra **Mensagens Salvas** e clique em
-   um áudio curto para testar o envio.
-8. Teste a troca entre duas conversas que você controle antes de iniciar atendimentos.
+Quando o endereço estiver disponível, informe a origem completa, sem barra no
+final, em `DASHBOARD_ORIGINS` no serviço web da API. Exemplo:
 
-## 5. Publicar o dashboard administrativo
+```text
+https://telegram-atendimento-dashboard.onrender.com
+```
 
-1. No Render, crie um **Static Site** usando o mesmo repositório.
-2. Em **Root Directory**, informe `dashboard`.
-3. Deixe **Build Command** vazio e use `.` em **Publish Directory**.
-4. Publique e copie a URL HTTPS gerada para o dashboard.
-5. Abra o serviço do backend no Render e adicione a variável
-   `DASHBOARD_ORIGINS` com a URL copiada, sem barra no final.
-6. Salve as variáveis e aguarde a nova publicação do backend.
-7. Abra o dashboard, clique em **Configurações** e informe a URL do backend e o
-   mesmo `ACCESS_TOKEN` usado na extensão.
+Separe várias origens por vírgula. Faça novo deploy da API após salvar a
+variável. Para teste local, execute um servidor estático na pasta `dashboard`
+em `http://localhost:4173`; essa origem já é aceita pelo backend.
 
-O upload passa pelo backend e é salvo no bucket privado do Supabase. Não coloque
-`SUPABASE_SERVICE_ROLE_KEY`, `sb_secret_...` ou `service_role` no dashboard.
+No dashboard, informe a URL da API e o `ACCESS_TOKEN`. A interface permite
+adicionar, editar, excluir, ativar/desativar, reordenar, favoritar, pesquisar,
+categorizar, ouvir e substituir áudios. A alteração é persistida no Supabase
+pela API e a extensão consulta a biblioteca automaticamente.
 
-## O que fica onde
+Na lateral do dashboard, clique em **Conectar conta** para concluir a
+autenticação do Telegram. O telefone, o código recebido e a senha 2FA são
+solicitados somente nessa interface administrativa.
 
-- **GitHub:** código, sem credenciais ou áudios.
-- **Render:** processo de atendimento, conversão e cache temporário de mídia.
-- **Supabase Storage:** áudios, imagens e vídeos, em bucket privado.
-- **Supabase Database:** biblioteca, favoritos, sequências e sessão criptografada.
-- **Chrome:** URL da instalação e chave de acesso. Não armazena a chave administrativa
-  do Supabase nem a sessão do Telegram.
+## 4. Instalar a extensão
 
-A criptografia da sessão usa uma chave derivada do segredo `SESSION_ENCRYPTION_KEY`
-gerado no Render. Não troque esse segredo ao atualizar: o banco não terá como abrir
-uma sessão cifrada com outra chave. Faça backup seguro dele separadamente dos dados.
-Uma sessão da 3.0 anterior não deve ser copiada para esta versão: faça login novamente.
+1. Abra `chrome://extensions`.
+2. Ative **Modo do desenvolvedor**.
+3. Clique em **Carregar sem compactação** e selecione a pasta `extension`.
+4. Abra **Detalhes → Opções** da extensão.
+5. Informe a URL HTTPS da API do Render e o `ACCESS_TOKEN`; autorize o acesso ao
+   endereço quando o Chrome solicitar.
+6. Abra ou atualize o Telegram Web.
 
-## Funcionamento gratuito e limitações
+Não haverá popup, painel lateral ou menu de administração. Ao abrir uma
+conversa privada compatível, a extensão identifica o destinatário pela URL e
+mostra apenas os áudios ativos em uma barra horizontal acima do campo de
+mensagem. Um clique inicia o envio; durante a confirmação os botões ficam
+desabilitados para evitar duplicidade.
 
-- O Render Free adormece após 15 minutos sem tráfego recebido e pode demorar cerca de
-  um minuto para acordar. Os dados permanentes são recuperados do Supabase.
-- Envios em andamento param quando o processo é encerrado. Não há retomada automática;
-  confira a conversa antes de iniciar de novo. O histórico de envios é temporário.
-- Uma sequência permanece ligada ao destinatário escolhido, mesmo ao trocar de conversa.
-  Parar impede as próximas etapas; uma mensagem já em transmissão pode terminar.
-- O Supabase Free inclui 1 GB de arquivos, limites de transferência e pausa após uma
-  semana de inatividade. Se for pausado, reative o projeto pelo painel.
-- O Render também impõe limites de horas, tráfego e uso de conexões externas. Não há
-  garantia de atendimento contínuo no plano gratuito. Nenhum script de tráfego
-  artificial ou mecanismo de contornar cotas está incluído.
-- Limite de 50 MB por arquivo de entrada e de saída convertida. A CPU e a memória do
-  plano gratuito podem limitar conversões antes desse tamanho, especialmente vídeos.
-- Use um serviço e uma instância por instalação. Esta versão guarda os metadados em
-  registros JSON compartilhados; não foi projetada para vários servidores escrevendo
-  ao mesmo tempo. Pause cadastros, exclusões e envios antes de publicar atualizações.
-- Conserve os arquivos originais. Se uma conversão for enviada ao Storage e o banco
-  falhar em seguida, pode sobrar um arquivo sem item na biblioteca; isso preserva o
-  arquivo diante de falha ambígua, mas pode consumir cota até uma limpeza manual.
-- Revogar uma chave de acesso requer alterá-la no Render e atualizar as extensões
-  autorizadas. Quem tem a mesma chave acessa a mesma conta e a mesma biblioteca.
+A autenticação da conta Telegram continua sendo feita pela API e usa o mesmo
+fluxo existente, agora apresentado no dashboard. A extensão apenas consulta o
+destinatário atual e solicita o envio; ela não exibe formulário de login nem
+recebe a chave do Supabase.
 
-## Se ocorrer um erro
+## 5. Supabase: é preciso criar algo novo?
 
-- **Supabase 401/403:** confira a chave secreta de servidor; anon não serve.
-- **Supabase 404:** confira o Project URL, o SQL e a existência do bucket `ta-media`.
-- **Supabase sem resposta:** confira se o projeto está ativo e se há cotas disponíveis.
-- **Erro para abrir sessão:** confira `SESSION_ENCRYPTION_KEY` e sua versão anterior.
-- **Build não encontra Dockerfile:** confira se `server/Dockerfile` e `render.yaml`
-  estão nos caminhos indicados e se o arquivo está na raiz do repositório.
-- **Versão incompatível:** atualize a pasta extension deste pacote e recarregue no Chrome.
-- **Demora ao abrir:** aguarde o Render despertar e clique em Tentar novamente se necessário.
+Não. A versão 4.0 reutiliza `public.ta_state` e o bucket privado `ta-media`.
 
-## Validação e referências
+Ao iniciar, o backend migra metadados antigos para os campos `active`,
+`sortOrder` e `updatedAt`, preserva favoritos/arquivos e cria a categoria
+`Geral` no registro `categories` de `ta_state`. Não crie políticas públicas.
 
-18 testes automatizados locais passaram. Os serviços externos foram simulados e as
-conversões foram realizadas com FFmpeg real. O SQL, o Docker e o envio real precisam
-ser validados nas suas contas. Para executar os testes em um ambiente de desenvolvimento,
-use `npm test` na pasta server; os testes de conversão exigem `FFMPEG_PATH` e ffprobe.
+## 6. Limites e segurança
 
-- [Limitações do Render gratuito](https://render.com/docs/free)
-- [Configuração por Blueprint](https://render.com/docs/blueprint-spec)
-- [Planos do Supabase](https://supabase.com/pricing)
-- [Chaves de API do Supabase](https://supabase.com/docs/guides/getting-started/api-keys)
-- [Arquivos privados do Supabase](https://supabase.com/docs/guides/storage/serving/downloads)
+- Uma mensagem de voz continua limitada a 50 MB na entrada e na saída.
+- O bucket `ta-media` permanece privado; o dashboard acessa prévias via API.
+- O ACCESS_TOKEN é administrativo para esta instalação. Use-o apenas em um
+  dashboard privado e nos seus navegadores autorizados.
+- A extensão atende conversas privadas, como a versão anterior. Grupos,
+  canais e links fora de `web.telegram.org` são recusados.
+- O Render gratuito pode hibernar, e conversões podem demorar em arquivos
+  grandes. Aguarde o estado final antes de clicar novamente.
+
+## 7. Teste local do backend
+
+Na pasta `server`, com Node.js 20 ou superior:
+
+```bash
+npm ci
+FFMPEG_PATH=/usr/bin/ffmpeg npm test
+```
+
+Os testes usam clientes e armazenamento simulados; login real, SQL real e
+envio real precisam ser validados nas suas contas.

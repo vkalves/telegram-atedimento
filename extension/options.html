@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Telegram Atendimento 4.0 · Configuração</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="card">
+    <div class="brand"><span class="brand-icon">♫</span><div><h1>Telegram Atendimento <span>4.0</span></h1><p>Configuração única da extensão</p></div></div>
+    <div id="notice" class="notice" role="status">Informe o endereço do Render e a chave de acesso.</div>
+    <form id="form">
+      <label>Endereço da instalação online<input id="apiUrl" type="url" required placeholder="https://telegram-atendimento.onrender.com" autocomplete="url"></label>
+      <label>Chave de acesso<input id="token" type="password" minlength="32" required autocomplete="off" placeholder="ACCESS_TOKEN do Render"></label>
+      <button id="save" type="submit">Testar e salvar</button>
+      <button id="clear" class="secondary" type="button">Apagar configuração</button>
+    </form>
+    <p class="hint">A extensão usa somente a API do Render. A chave fica armazenada localmente neste navegador e nunca é enviada ao Telegram Web.</p>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>
