@@ -88,6 +88,19 @@ test('new private context is resolved and channel contexts are refused',async()=
  service.resolveTarget=async()=>({id:77n,className:'Channel'});await assert.rejects(service.currentTarget('77'),/privadas/);
 });
 
+test('username context resolves quickly and falls back to a matching dialog',async()=>{
+ const service=new TelegramService({apiId:1,apiHash:'test',dataDir:'/unused'});let dialogCalls=0;
+ service.client={
+  checkAuthorization:async()=>true,
+  getEntity:async()=>{throw new Error('username lookup failed');},
+  getDialogs:async()=>{dialogCalls++;return [{name:'Viela 2K',entity:{id:88n,username:'viela2k',firstName:'Viela',lastName:'2K',className:'User'}}];},
+  getPeerId:async entity=>entity.id.toString()
+ };
+ const target=await service.currentTarget('@Viela2K');
+ assert.deepEqual(target,{id:'88',name:'Viela 2K',username:'viela2k'});
+ assert.equal(dialogCalls,1);
+});
+
 test('Supabase-backed audio, favorites and sequences survive removal of all local data',async()=>{
  const state=new Map(),objects=new Map();let uploads=0,downloads=0;
  const store={getState:async id=>structuredClone(state.get(id)??null),setState:async(id,value)=>state.set(id,structuredClone(value)),upload:async(name,file)=>{uploads++;objects.set(name,await fs.readFile(file));},download:async(name,file)=>{downloads++;if(!objects.has(name))throw new Error('Missing remote object');await fs.writeFile(file,objects.get(name));},remove:async name=>objects.delete(name)};
