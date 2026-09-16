@@ -1,6 +1,7 @@
 (() => {
   const HOST_ID = 'telegram-atendimento-5-audio-bar';
-  const VERSION = '5.0.2';
+  const VERSION = '5.0.4';
+  const CONTEXT_RETRY_DELAYS = [1200, 3000, 7000];
   const LEGACY_HOST_ID = 'telegram-atendimento-4-audio-bar';
   const legacyHost = document.getElementById(LEGACY_HOST_ID);
   if (legacyHost) {
@@ -22,9 +23,15 @@
   function peerFromURL(href) {
     try {
       const url = new URL(href);
-      if (url.origin !== 'https://web.telegram.org' || !/^\/(a|k)\/?$/.test(url.pathname)) return null;
-      const hash = decodeURIComponent(url.hash.slice(1));
-      return /^(?:[1-9]\d{0,19}|@[A-Za-z0-9_]{5,32})$/.test(hash) ? hash : null;
+      if (url.origin !== 'https://web.telegram.org' || !/^\/(?:a|k)\/?$/.test(url.pathname)) return null;
+      const raw = url.hash.slice(1).trim();
+      if (!raw) return null;
+      const hash = decodeURIComponent(raw).trim();
+      const nested = hash.match(/^\/?im\?(?:p|peer|id)=([^&]+)$/i);
+      const candidate = String(nested ? nested[1] : hash).trim();
+      if (/^[1-9]\d{0,19}$/.test(candidate)) return candidate;
+      if (!/^@?[A-Za-z][A-Za-z0-9_]{4,31}$/.test(candidate)) return null;
+      return candidate.startsWith('@') ? candidate : `@${candidate}`;
     } catch { return null; }
   }
 
@@ -72,7 +79,7 @@
   const messageElement = root.querySelector('.message');
   const previousButton = root.querySelector('.previous');
   const nextButton = root.querySelector('.next');
-  const state = {key:null,target:null,stamp:'',generation:0,configured:false,items:[],loading:false,error:''};
+  const state = {key:null,target:null,stamp:'',generation:0,configured:false,items:[],loading:false,contextLoading:false,error:''};
   const inFlight = new Map();
   const feedback = new Map();
   let scheduledPosition = false;
@@ -88,6 +95,8 @@
   let usingChatPaddingFallback = false;
   let reservationObserver = null;
   let reservationApplying = false;
+  let contextRetryTimer = null;
+  let contextAttempt = 0;
 
   function isVisible(element) {
     const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
@@ -247,6 +256,26 @@
     if (!scheduledPosition) {scheduledPosition = true;requestAnimationFrame(positionBar);}
   }
 
+  function clearContextRetry() {
+    if (contextRetryTimer !== null) {
+      clearTimeout(contextRetryTimer);
+      contextRetryTimer = null;
+    }
+  }
+
+  function scheduleContextRetry(generation, delay) {
+    clearContextRetry();
+    contextRetryTimer = setTimeout(() => {
+      contextRetryTimer = null;
+      if (generation === state.generation) void syncContext(true);
+    }, delay);
+  }
+
+  function isPermanentContextError(error) {
+    const message = String(error?.message || error || '').toLowerCase();
+    return /senha incorreta|origem não autorizada|conecte sua conta|abra uma conversa privada|atende conversas privadas|endereço da instalação inválido/.test(message);
+  }
+
   function setMessage(text = '', type = '') {
     messageElement.textContent = text;
     messageElement.className = `message ${type}`.trim();
@@ -270,8 +299,9 @@
     if (note) setMessage(note.text, note.type);
     else if (!state.configured) setMessage('Configure a extensão em Opções');
     else if (state.loading) setMessage('Carregando…');
+    else if (state.contextLoading) setMessage('Identificando…');
     else if (state.error) setMessage(state.error, 'error');
-    else if (!state.target) setMessage('Identificando…');
+    else if (!state.target) setMessage('Abra uma conversa privada');
     else if (busy) setMessage('Enviando…', 'success');
     else if (!state.items.length) setMessage('Nenhum áudio ativo');
     else setMessage('');
@@ -279,7 +309,7 @@
     if (!state.configured) {
       const setup = document.createElement('button');setup.type='button';setup.className='setup';setup.textContent='Abrir Opções';setup.onclick=()=>chrome.runtime.sendMessage({type:'open-options'}).catch(()=>{});itemsElement.append(setup);
     } else if (state.error) {
-      const retry = document.createElement('button');retry.type='button';retry.className='setup';retry.textContent='Tentar novamente';retry.onclick=()=>{state.error='';loadLibrary(true);syncContext(true);};itemsElement.append(retry);
+      const retry = document.createElement('button');retry.type='button';retry.className='setup';retry.textContent='Tentar novamente';retry.onclick=()=>{clearContextRetry();contextAttempt=0;state.error='';syncContext(true);};itemsElement.append(retry);
     } else {
       for (const item of state.items) {
         const button = document.createElement('button');button.type='button';button.className='audio';button.title=`Enviar ${item.name}`;button.setAttribute('aria-label',`Enviar ${item.name}`);button.disabled=!state.target||!!busy;
@@ -359,16 +389,28 @@
   async function syncContext(force = false) {
     const stamp=location.href,key=peerFromURL(stamp);
     if (!force && stamp === state.stamp) return;
-    state.stamp=stamp;state.key=key;state.target=null;state.error='';state.generation++;
+    const sameStamp = stamp === state.stamp;
+    clearContextRetry();
+    if (!sameStamp) contextAttempt=0;
+    state.stamp=stamp;state.key=key;state.target=null;state.error='';state.contextLoading=!!key && state.configured;state.generation++;
     const generation=state.generation;render();
-    if (!key || !state.configured) return;
+    if (!key || !state.configured) {state.contextLoading=false;render();return;}
     try {
       const data=await api('/context',{method:'POST',body:{peerKey:key}});
       if (generation !== state.generation) return;
-      state.target=data.target;state.error='';render();await refreshRunningJob();
+      if (!data?.target || data.target.id === undefined || data.target.id === null) throw new Error('Não consegui identificar a conversa atual.');
+      state.target={...data.target,id:String(data.target.id)};state.error='';state.contextLoading=false;contextAttempt=0;render();await refreshRunningJob();
     } catch (error) {
       if (generation !== state.generation) return;
-      state.error=error.message;render();
+      if (isPermanentContextError(error)) {
+        state.contextLoading=false;state.error=error.message || 'Não foi possível identificar a conversa atual.';render();return;
+      }
+      if (contextAttempt < CONTEXT_RETRY_DELAYS.length) {
+        const delay=CONTEXT_RETRY_DELAYS[contextAttempt++];
+        state.contextLoading=true;state.error='';render();scheduleContextRetry(generation,delay);
+      } else {
+        state.contextLoading=false;state.error=error.message || 'Não consegui identificar a conversa atual.';render();
+      }
     }
   }
 
@@ -443,7 +485,7 @@
     if(configurationBusy)return;configurationBusy=true;
     try{
       const result=await chrome.runtime.sendMessage({type:'connection-status'});
-      if(!!result?.configured!==state.configured){state.configured=!!result?.configured;state.error='';render();if(state.configured){await loadLibrary(true);await syncContext(true);}}
+      if(!!result?.configured!==state.configured){state.configured=!!result?.configured;state.error='';contextAttempt=0;clearContextRetry();render();if(state.configured)await loadLibrary(true);await syncContext(true);}
     }catch{}finally{configurationBusy=false;}
   },10000);
   void boot();
