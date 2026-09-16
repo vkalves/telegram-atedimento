@@ -27,6 +27,7 @@ export class TelegramService {
     this.lastError = "";
     this.pending = null;
     this.authPromise = null;
+    this.authRetryAt = 0;
     this.dialogMap = new Map();
     this.dialogMapUpdatedAt = 0;
     this.dialogRefreshPromise = null;
@@ -106,6 +107,10 @@ export class TelegramService {
       return;
     }
     if (this.authPromise) return;
+    if (this.authRetryAt > Date.now()) {
+      const seconds = Math.ceil((this.authRetryAt - Date.now()) / 1000);
+      throw new Error(`FLOOD_WAIT_${seconds}`);
+    }
 
     this.lastError = "";
     this.state = "starting";
@@ -116,6 +121,15 @@ export class TelegramService {
       password: async () => await this.waitFor("need_password"),
       onError: (err) => {
         this.lastError = this.friendlyError(err);
+        const seconds = this.floodWaitSeconds(err);
+        if (seconds) {
+          this.authRetryAt = Math.max(this.authRetryAt, Date.now() + seconds * 1000);
+          // teleproto retries authentication while onError returns false.
+          // A flood wait must end this attempt, otherwise the retry loop
+          // immediately sends another auth request and extends the block.
+          return true;
+        }
+        return false;
       }
     })
       .then(async () => {
@@ -133,7 +147,9 @@ export class TelegramService {
       .catch(err => {
         this.pending = null;
         this.state = "error";
-        this.lastError = this.friendlyError(err);
+        // teleproto rejects with AUTH_USER_CANCEL after onError asks it to
+        // stop. Keep the useful Telegram error captured by the callback.
+        if (!this.lastError) this.lastError = this.friendlyError(err);
       })
       .finally(() => {
         this.authPromise = null;
@@ -173,10 +189,22 @@ export class TelegramService {
     for (const [key, value] of Object.entries(known)) {
       if (raw.includes(key)) return value;
     }
-    if (raw.includes("FLOOD_WAIT")) {
-      return "O Telegram pediu para aguardar antes de tentar novamente.";
+    const seconds = this.floodWaitSeconds(err);
+    if (seconds) {
+      const minutes = Math.ceil(seconds / 60);
+      const wait = seconds < 60
+        ? `${seconds} segundo${seconds === 1 ? "" : "s"}`
+        : `${minutes} minuto${minutes === 1 ? "" : "s"}`;
+      return `O Telegram limitou novas tentativas. Aguarde ${wait} antes de tentar novamente.`;
     }
     return raw.slice(0, 220);
+  }
+
+  floodWaitSeconds(err) {
+    const raw = String(err?.errorMessage || err?.message || err || "");
+    const match = raw.match(/FLOOD(?:_PREMIUM)?_WAIT_(\d+)/i);
+    const seconds = Number(err?.seconds || match?.[1] || 0);
+    return Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
   }
 
   async requireAuthorized() {
@@ -250,74 +278,3 @@ export class TelegramService {
       entity = this.findDialogByUsername(key);
       if (!entity) {
         try {
-          entity = await this.resolveTarget({username:key});
-        } catch (lookupError) {
-          try {
-            await this.refreshDialogsForTarget();
-            entity = this.findDialogByUsername(key);
-          } catch {}
-          if (!entity) throw lookupError;
-        }
-      }
-    } else {
-      entity = await this.resolveTarget({dialogId:key});
-    }
-
-    const className = entity?.className || entity?.constructor?.name;
-    if (!entity || className !== 'User') throw new Error("Esta versão atende conversas privadas. Abra uma conversa com uma pessoa.");
-    const id = String(await this.client.getPeerId(entity));
-    this.dialogMap.set(id,entity);
-    return {id,name: [entity.firstName,entity.lastName].filter(Boolean).join(' ') || entity.username || 'Conversa',username:entity.username || null};
-  }
-
-  async resolveTarget({ dialogId, username }) {
-    await this.requireAuthorized();
-
-    if (username) {
-      const clean = String(username).trim().replace(/^@/, "");
-      if (!clean) throw new Error("Informe um @usuário válido.");
-      return await this.client.getEntity(clean);
-    }
-
-    if (!dialogId) throw new Error("Escolha uma conversa.");
-
-    if (this.dialogMap.has(String(dialogId))) {
-      return this.dialogMap.get(String(dialogId));
-    }
-
-    await this.getDialogs(100);
-    if (this.dialogMap.has(String(dialogId))) {
-      return this.dialogMap.get(String(dialogId));
-    }
-
-    try {
-      return await this.client.getEntity(BigInt(dialogId));
-    } catch {
-      throw new Error("Não consegui localizar essa conversa. Atualize a lista e tente novamente.");
-    }
-  }
-
-  async sendItem(item, target) {
-    const entity = await this.resolveTarget(target);
-    let result;
-    if (item.kind === "text") {
-      result = await this.client.sendMessage(entity, { message: item.text, parseMode: false });
-    } else {
-      const voice = !item.kind || item.kind === "voice";
-      const options = { file: item.path, workers: 1, parseMode: false };
-      if (voice) {
-        options.voiceNote = true;
-        options.attributes = [new Api.DocumentAttributeAudio({
-          voice: true, duration: Math.max(1, Math.round(item.duration || 1))
-        })];
-      }
-      if (item.kind === 'video') {
-        options.supportsStreaming = true;
-        options.attributes = [new Api.DocumentAttributeVideo({duration: item.duration || 1, w:item.width || 2, h:item.height || 2, supportsStreaming:true})];
-      }
-      result = await this.client.sendFile(entity, options);
-    }
-    if (!result?.id) throw new Error("O Telegram não confirmou o envio. Confira a conversa antes de tentar novamente.");
-    return { messageId: String(result.id) };
-  }
-}
