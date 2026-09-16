@@ -121,12 +121,14 @@ export class TelegramService {
       password: async () => await this.waitFor("need_password"),
       onError: (err) => {
         this.lastError = this.friendlyError(err);
-        const seconds = this.floodWaitSeconds(err);
-        if (seconds) {
-          this.authRetryAt = Math.max(this.authRetryAt, Date.now() + seconds * 1000);
+        if (this.authErrorShouldStop(err)) {
+          const seconds = this.floodWaitSeconds(err);
+          if (seconds) {
+            this.authRetryAt = Math.max(this.authRetryAt, Date.now() + seconds * 1000);
+          }
           // teleproto retries authentication while onError returns false.
-          // A flood wait must end this attempt, otherwise the retry loop
-          // immediately sends another auth request and extends the block.
+          // Flood waits and terminal account/configuration errors must end
+          // this attempt; retrying them can extend the block or loop forever.
           return true;
         }
         return false;
@@ -140,6 +142,7 @@ export class TelegramService {
           await fs.chmod(this.sessionPath, 0o600).catch(() => {});
         }
         this.sessionPersisted = true;
+        this.authRetryAt = 0;
         this.pending = null;
         this.state = "authorized";
         this.lastError = "";
@@ -205,6 +208,21 @@ export class TelegramService {
     const match = raw.match(/FLOOD(?:_PREMIUM)?_WAIT_(\d+)/i);
     const seconds = Number(err?.seconds || match?.[1] || 0);
     return Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+  }
+
+  authErrorShouldStop(err) {
+    if (this.floodWaitSeconds(err)) return true;
+    const raw = String(err?.errorMessage || err?.message || err || '').toUpperCase();
+    return [
+      'API_ID_INVALID',
+      'API_HASH_INVALID',
+      'PHONE_NUMBER_INVALID',
+      'PHONE_NUMBER_BANNED',
+      'PHONE_CODE_EXPIRED',
+      'AUTH_KEY_UNREGISTERED',
+      'SESSION_REVOKED',
+      'USER_DEACTIVATED_BAN'
+    ].some(code => raw.includes(code));
   }
 
   async requireAuthorized() {
@@ -313,7 +331,9 @@ export class TelegramService {
       return this.dialogMap.get(String(dialogId));
     }
 
-    await this.getDialogs(100);
+    // A single failed refresh must not prevent the direct entity lookup.
+    // This matters after a Render wake-up or when Telegram omits a dialog.
+    try { await this.getDialogs(100); } catch {}
     if (this.dialogMap.has(String(dialogId))) {
       return this.dialogMap.get(String(dialogId));
     }

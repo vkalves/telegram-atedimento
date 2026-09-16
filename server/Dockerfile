@@ -8,9 +8,9 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY package.json ./
+COPY package*.json ./
 
-RUN npm install --omit=dev --ignore-scripts \
+RUN npm ci --omit=dev --ignore-scripts \
     && npm cache clean --force
 
 COPY src ./src

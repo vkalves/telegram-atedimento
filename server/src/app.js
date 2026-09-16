@@ -19,9 +19,12 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
   if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'4.0.3',apiVersion:'3.0.1',extensionPasswordConfigured:!!extensionPassword});
   const origin=req.get('Origin')||'',supplied=Buffer.from(req.get('Authorization')||'');
   const matches=secret=>{const expected=Buffer.from('Bearer '+secret);return supplied.length===expected.length&&crypto.timingSafeEqual(supplied,expected);};
-  // The extension password is valid for the authenticated extension/dashboard request.
-  // CORS origin validation above still blocks unapproved browser origins.
-  const authorized=matches(token)||(extensionPassword&&matches(extensionPassword));
+  const extensionOrigin=/^chrome-extension:\/\/([a-p]{32})$/.exec(origin);
+  const trustedExtension=!!extensionOrigin&&(!extensionIds.length||extensionIds.includes(extensionOrigin[1]));
+  // ACCESS_TOKEN is usable for server-to-server calls. The simpler extension
+  // password must be tied to the browser extension origin, otherwise a leaked
+  // password could be replayed from curl or an unrelated website.
+  const authorized=matches(token)||(extensionPassword&&trustedExtension&&matches(extensionPassword));
   if(!authorized){
    const now=Date.now(),key=req.ip;for(const [k,v]of loginRates)if(now-v.since>60000)loginRates.delete(k);
    const entry=loginRates.get(key)||{since:now,count:0};entry.count++;loginRates.set(key,entry);
@@ -36,7 +39,7 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
   next();
  });
  app.use(express.json({limit:'1mb'}));
- const upload=multer({dest:library.uploadDir,limits:{fileSize:50*1024*1024,files:1}});
+ const upload=multer({dest:library.uploadDir,limits:{fileSize:50*1024*1024,files:1,fields:10,fieldSize:64*1024,parts:11}});
  app.get('/auth/status',async(_q,r)=>r.json(await telegram.status()));
  app.post('/auth/start',async(q,r)=>{const phone=String(q.body.phone||'').replace(/\s/g,'');if(!/^\+\d{8,16}$/.test(phone))throw new Error('Use o telefone com DDI: +55...');await telegram.startLogin(phone);r.json({ok:true});});
  app.post('/auth/code',(q,r)=>{if(!q.body.code)throw new Error('Informe o código.');telegram.submitCode(String(q.body.code).trim());r.json({ok:true});});
@@ -72,6 +75,10 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
  });
  app.get('/jobs',(_q,r)=>r.json({jobs:[...jobs.jobs.keys()].map(id=>jobs.get(id))}));
  app.post('/jobs/:id/cancel',(q,r)=>r.json({job:jobs.cancel(q.params.id)}));
- app.use((err,_q,r,_n)=>r.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:err.code==='LIMIT_FILE_SIZE'?'O arquivo excede 50 MB.':telegram.friendlyError(err)}));
+ app.use((err,_q,r,_n)=>{
+  const messages={LIMIT_FILE_SIZE:'O arquivo excede 50 MB.',LIMIT_FIELD_SIZE:'Os dados do formulário excedem o limite permitido.',LIMIT_FIELD_COUNT:'O formulário contém campos demais.',LIMIT_PART_COUNT:'O formulário contém partes demais.',LIMIT_UNEXPECTED_FILE:'Campo de arquivo inesperado.'};
+  const message=messages[err.code]||telegram.friendlyError(err);
+  r.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:message});
+ });
  return app;
 }

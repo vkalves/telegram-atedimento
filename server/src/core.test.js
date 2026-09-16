@@ -29,6 +29,17 @@ test('flood waits stop the authentication retry loop and preserve the wait messa
  assert.equal(attempts,1);assert.equal(shouldStop,true);assert.equal(service.state,'error');assert.match(service.lastError,/42 segundos/);assert(service.authRetryAt>Date.now());
  await assert.rejects(service.startLogin('+5511999999999'),/FLOOD_WAIT_/);
 });
+test('terminal authentication errors stop retries while input errors remain retryable',async()=>{
+ const service=new TelegramService({apiId:1,apiHash:'test',dataDir:'/unused'});
+ assert.equal(service.authErrorShouldStop({errorMessage:'PHONE_NUMBER_INVALID'}),true);
+ assert.equal(service.authErrorShouldStop({errorMessage:'PHONE_CODE_EXPIRED'}),true);
+ assert.equal(service.authErrorShouldStop({errorMessage:'PHONE_CODE_INVALID'}),false);
+ assert.equal(service.authErrorShouldStop({errorMessage:'PASSWORD_HASH_INVALID'}),false);
+ let shouldStop;
+ service.client={checkAuthorization:async()=>false,start:async({onError})=>{shouldStop=onError({errorMessage:'PHONE_NUMBER_INVALID'});if(shouldStop)throw new Error('AUTH_USER_CANCEL');}};
+ await service.startLogin('+5511999999999');await sleep(0);
+ assert.equal(shouldStop,true);assert.equal(service.state,'error');assert.match(service.lastError,/número.*inválido/i);
+});
 test('duplicate clicks, per-recipient isolation, cancellation and failures',async()=>{
   const sent=[],tg={requireAuthorized:async()=>{},friendlyError:e=>e.message,sendItem:async(item,target)=>{sent.push([item.id,target.dialogId]);return{messageId:String(sent.length)};}},lib={get:async id=>({id})},jobs=new Jobs(tg,lib);
   const input={requestId:'request-0001',dialogId:'11',steps:[{id:'a',delay:0},{id:'b',delay:1}]};
@@ -77,6 +88,7 @@ test('online API requires bearer token, accepts the extension password only from
   const passwordHeaders={Authorization:'Bearer '+extensionPassword,Origin:'chrome-extension://'+'a'.repeat(32)};
   assert.equal((await fetch(base+'/library',{headers:passwordHeaders})).status,200);
   assert.equal((await fetch(base+'/library',{headers:{Authorization:'Bearer '+extensionPassword}})).status,401);
+  assert.equal((await fetch(base+'/library',{headers:{...passwordHeaders,Origin:'https://example.com'}})).status,403);
   const headers={Authorization:'Bearer '+token,'Content-Type':'application/json',Origin:'chrome-extension://'+'a'.repeat(32)};
   assert.equal((await fetch(base+'/library',{headers})).status,200);
   const text=(await (await fetch(base+'/library',{method:'POST',headers,body:JSON.stringify({kind:'text',text:'Demo',name:'Mensagem'})})).json()).item;
@@ -106,6 +118,17 @@ test('username context resolves quickly and falls back to a matching dialog',asy
  const target=await service.currentTarget('@Viela2K');
  assert.deepEqual(target,{id:'88',name:'Viela 2K',username:'viela2k'});
  assert.equal(dialogCalls,1);
+});
+
+test('numeric context falls back to direct lookup when refreshing dialogs fails',async()=>{
+ const service=new TelegramService({apiId:1,apiHash:'test',dataDir:'/unused'});
+ service.client={
+  checkAuthorization:async()=>true,
+  getDialogs:async()=>{throw new Error('dialog refresh unavailable');},
+  getEntity:async id=>({id,className:'User',firstName:'Ana'}),
+  getPeerId:async entity=>entity.id.toString()
+ };
+ assert.deepEqual(await service.currentTarget('11'),{id:'11',name:'Ana',username:null});
 });
 
 test('Supabase-backed audio, favorites and sequences survive removal of all local data',async()=>{

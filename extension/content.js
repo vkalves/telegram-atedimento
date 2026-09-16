@@ -173,7 +173,7 @@
     itemsElement.replaceChildren();
     if (!state.key || !findComposer()) {host.style.display = 'none';clearChatReserve();return;}
     host.style.display = 'block';
-    const busy = state.target && inFlight.has(state.target.id);
+    const busy = state.target && inFlight.has(String(state.target.id));
     const note = currentFeedback();
     if (note) setMessage(note.text, note.type);
     else if (!state.configured) setMessage('Configure a extensão em Opções');
@@ -218,7 +218,7 @@
   }
 
   async function refreshRunningJob() {
-    if (!state.target || !state.configured || inFlight.has(state.target.id)) return;
+    if (!state.target || !state.configured || inFlight.has(String(state.target.id))) return;
     try {
       const data=await api('/jobs');
       const job=(data.jobs || []).find(item=>item.dialogId===String(state.target.id)&&item.state==='running');
@@ -233,7 +233,7 @@
     try {
       const data=await api('/jobs'), jobs=data.jobs || [];
       for (const [targetId, entry] of inFlight) {
-        const job=jobs.find(item=>item.id===entry.jobId);
+        const job=jobs.find(item=>item.id===entry.jobId||item.id===entry.requestId);
         if (job?.state === 'running') continue;
         if (!job) {
           if (Date.now()-entry.startedAt < 120000) continue;
@@ -249,14 +249,16 @@
   async function sendItem(item) {
     if (!state.target || inFlight.has(String(state.target.id))) return;
     const target=state.target,key=state.key,stamp=location.href;
-    inFlight.set(String(target.id),{jobId:null,label:item.name,startedAt:Date.now()});render();
+    const requestId=crypto.randomUUID();
+    inFlight.set(String(target.id),{jobId:null,requestId,label:item.name,startedAt:Date.now()});render();
     try {
       const freshKey=peerFromURL(location.href);
       if (freshKey !== key || stamp !== location.href) throw new Error('A conversa mudou. Escolha o áudio novamente.');
-      const data=await api('/jobs',{method:'POST',body:{requestId:crypto.randomUUID(),dialogId:String(target.id),peerKey:key,steps:[{id:item.id,delay:0}],label:item.name}});
+      const data=await api('/jobs',{method:'POST',body:{requestId,dialogId:String(target.id),peerKey:key,steps:[{id:item.id,delay:0}],label:item.name}});
       const job=data.job;
       if (!job?.id) throw new Error('O servidor não confirmou o envio.');
-      inFlight.set(String(target.id),{jobId:job.id,label:item.name,startedAt:Date.now()});
+      const current=inFlight.get(String(target.id));
+      inFlight.set(String(target.id),{jobId:job.id,requestId,label:item.name,startedAt:current?.startedAt||Date.now()});
       setMessage('Enviando…','success');
       void reconcileJobs();
     } catch (error) {

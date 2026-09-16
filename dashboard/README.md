@@ -32,6 +32,6 @@ estáticos. O endereço usado precisa ser incluído em `DASHBOARD_ORIGINS`.
 
 ## Segurança
 
-O dashboard pede o mesmo `ACCESS_TOKEN` usado pela extensão e o guarda no
-`localStorage` deste navegador. Nunca coloque a chave `SUPABASE_SERVICE_ROLE_KEY`
+O dashboard pede o `ACCESS_TOKEN` do servidor e o guarda no `localStorage` deste
+navegador. A extensão usa a senha separada `EXTENSION_PASSWORD`. Nunca coloque a chave `SUPABASE_SERVICE_ROLE_KEY`
 em qualquer arquivo desta pasta. O bucket continua privado.

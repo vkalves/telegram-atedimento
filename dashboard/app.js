@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const connectionStorageKey = 'telegram-atendimento-4-dashboard-connection';
-const state = {connection:null,items:[],categories:[],view:'library',favoriteOnly:false,editingAudio:null,editingCategory:null,localPreviewUrl:null,previewUrl:null,toastTimer:null,loading:false,telegramAuthBusy:false,telegramPoll:null};
+const state = {connection:null,items:[],categories:[],view:'library',favoriteOnly:false,editingAudio:null,editingCategory:null,localPreviewUrl:null,previewUrl:null,toastTimer:null,loading:false,telegramAuthBusy:false,telegramStatusBusy:false,telegramPoll:null};
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -134,8 +134,11 @@ function setTelegramSteps(status) {
 }
 
 async function loadTelegramStatus(showError = false) {
+  if(state.telegramStatusBusy)return null;
+  state.telegramStatusBusy=true;
   try{const status=await api('/auth/status');renderTelegramStatus(status);setTelegramSteps(status);return status;}
   catch(error){renderTelegramStatus(null,error.message);if(showError)$('telegramError').textContent=error.message;return null;}
+  finally{state.telegramStatusBusy=false;}
 }
 
 async function telegramAction(path, body, buttonId) {
@@ -146,7 +149,7 @@ async function telegramAction(path, body, buttonId) {
 }
 
 function openTelegramDialog() {
-  $('telegramError').textContent='';$('telegramDialog').showModal();void loadTelegramStatus(true);clearInterval(state.telegramPoll);state.telegramPoll=setInterval(()=>{if($('telegramDialog').open&&!state.telegramAuthBusy)void loadTelegramStatus(true);},1000);
+  $('telegramError').textContent='';$('telegramDialog').showModal();void loadTelegramStatus(true);clearInterval(state.telegramPoll);state.telegramPoll=setInterval(()=>{if($('telegramDialog').open&&!state.telegramAuthBusy)void loadTelegramStatus(true);},1500);
 }
 
 function renderAudioList() {

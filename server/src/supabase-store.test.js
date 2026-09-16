@@ -5,6 +5,7 @@ test('REST adapter uses the private table, minimal upsert and server-only key',a
  const calls=[],store=new SupabaseStore({url:'https://example.supabase.co',key:'legacy-service-role-test',fetchImpl:async(url,options)=>{calls.push({url,options});return options.method==='POST'?new Response(null,{status:201}):new Response(JSON.stringify([{payload:['saved']}]),{status:200});}});
  assert.deepEqual(await store.getState('library'),['saved']);await store.setState('library',['next']);
  assert.match(calls[0].url,/ta_state\?select=payload&id=eq.library$/);assert.equal(calls[0].options.headers.Authorization,'Bearer legacy-service-role-test');assert.match(calls[1].options.headers.Prefer,/merge-duplicates/);assert.equal(JSON.parse(calls[1].options.body).id,'library');
+ assert.equal(calls[1].options.headers['Content-Type'],'application/json');
 });
 test('new secret keys use apikey without an invalid JWT bearer',async()=>{
  let options;const store=new SupabaseStore({url:'https://example.supabase.co',key:'sb_secret_TEST',fetchImpl:async(_u,o)=>{options=o;return new Response('[]');}});assert.equal(await store.getState('library'),null);assert.equal(options.headers.apikey,'sb_secret_TEST');assert.equal(options.headers.Authorization,undefined);
