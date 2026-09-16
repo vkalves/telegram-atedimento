@@ -1,4 +1,3 @@
-351 server/src/telegram.js
 import fs from "node:fs/promises";
 import path from "node:path";
 import {encodeSession,decodeSession} from "./session-store.js";
