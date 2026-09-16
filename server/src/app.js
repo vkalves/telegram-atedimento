@@ -19,8 +19,9 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
   if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'4.0.3',apiVersion:'3.0.1',extensionPasswordConfigured:!!extensionPassword});
   const origin=req.get('Origin')||'',supplied=Buffer.from(req.get('Authorization')||'');
   const matches=secret=>{const expected=Buffer.from('Bearer '+secret);return supplied.length===expected.length&&crypto.timingSafeEqual(supplied,expected);};
-  const extensionOrigin=/^chrome-extension:\/\/[a-p]{32}$/.test(origin);
-  const authorized=matches(token)||(extensionOrigin&&extensionPassword&&matches(extensionPassword));
+  // The extension password is valid for the authenticated extension/dashboard request.
+  // CORS origin validation above still blocks unapproved browser origins.
+  const authorized=matches(token)||(extensionPassword&&matches(extensionPassword));
   if(!authorized){
    const now=Date.now(),key=req.ip;for(const [k,v]of loginRates)if(now-v.since>60000)loginRates.delete(k);
    const entry=loginRates.get(key)||{since:now,count:0};entry.count++;loginRates.set(key,entry);
