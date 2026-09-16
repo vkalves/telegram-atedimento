@@ -76,18 +76,13 @@
   let jobsBusy = false;
   let configurationBusy = false;
   let reservedChat = null;
-  let reservedBottomPadding = null;
-  let previousBottomPaddingHeight = '';
-  let previousBottomPaddingPriority = '';
-  let baseBottomPaddingHeight = 0;
-  let appliedBottomPaddingHeight = 0;
+  let reservedDockPadding = null;
   let previousChatPadding = '';
   let previousChatPaddingPriority = '';
   let baseChatPadding = '';
   let appliedChatPadding = '';
   let usingChatPaddingFallback = false;
   let reservationObserver = null;
-  let bottomPaddingResizeObserver = null;
   let reservationApplying = false;
 
   function isVisible(element) {
@@ -121,22 +116,13 @@
   function clearChatReserve() {
     reservationObserver?.disconnect();
     reservationObserver = null;
-    bottomPaddingResizeObserver?.disconnect();
-    bottomPaddingResizeObserver = null;
-    if (reservedBottomPadding?.isConnected) {
-      if (previousBottomPaddingHeight) reservedBottomPadding.style.setProperty('height', previousBottomPaddingHeight, previousBottomPaddingPriority);
-      else reservedBottomPadding.style.removeProperty('height');
-    }
+    reservedDockPadding?.remove();
     if (usingChatPaddingFallback && reservedChat?.isConnected) {
       if (previousChatPadding) reservedChat.style.setProperty('--chat-padding-bottom', previousChatPadding, previousChatPaddingPriority);
       else reservedChat.style.removeProperty('--chat-padding-bottom');
     }
     reservedChat = null;
-    reservedBottomPadding = null;
-    previousBottomPaddingHeight = '';
-    previousBottomPaddingPriority = '';
-    baseBottomPaddingHeight = 0;
-    appliedBottomPaddingHeight = 0;
+    reservedDockPadding = null;
     previousChatPadding = '';
     previousChatPaddingPriority = '';
     baseChatPadding = '';
@@ -154,7 +140,9 @@
   function preserveScrollAfterReserve(scroller, wasNearBottom) {
     if (!scroller || !wasNearBottom) return;
     requestAnimationFrame(() => {
-      if (scroller.isConnected) scroller.scrollTop = scroller.scrollHeight;
+      if (!scroller.isConnected) return;
+      const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      if (scroller.scrollTop < maxScrollTop - 2) scroller.scrollTop = maxScrollTop;
     });
   }
 
@@ -173,7 +161,7 @@
     const dockHeight = Math.max(48, Math.ceil(host.getBoundingClientRect().height || 61));
     const bottomPadding = chat.querySelector('.bubbles-padding-bottom');
 
-    if (bottomPadding && usingChatPaddingFallback) {
+    if (scroller && usingChatPaddingFallback) {
       reservationApplying = true;
       if (previousChatPadding) chat.style.setProperty('--chat-padding-bottom', previousChatPadding, previousChatPaddingPriority);
       else chat.style.removeProperty('--chat-padding-bottom');
@@ -182,49 +170,32 @@
       usingChatPaddingFallback = false;
     }
 
-    if (bottomPadding !== reservedBottomPadding) {
-      bottomPaddingResizeObserver?.disconnect();
-      bottomPaddingResizeObserver = null;
-      if (reservedBottomPadding?.isConnected) {
-        if (previousBottomPaddingHeight) reservedBottomPadding.style.setProperty('height', previousBottomPaddingHeight, previousBottomPaddingPriority);
-        else reservedBottomPadding.style.removeProperty('height');
+    if (scroller) {
+      let dockChanged = false;
+      const spacerParent = bottomPadding?.parentElement || scroller;
+      const spacerNeedsRebuild = !reservedDockPadding?.isConnected ||
+        reservedDockPadding.parentElement !== spacerParent ||
+        (!!bottomPadding && reservedDockPadding.previousElementSibling !== bottomPadding);
+      if (spacerNeedsRebuild) {
+        reservedDockPadding?.remove();
+        reservedDockPadding = document.createElement('div');
+        reservedDockPadding.className = 'telegram-atendimento-5-bottom-reserve';
+        reservedDockPadding.setAttribute('aria-hidden', 'true');
+        reservedDockPadding.style.cssText = 'width:100%;height:0;flex:0 0 auto;pointer-events:none;';
+        if (bottomPadding?.parentElement === spacerParent) bottomPadding.after(reservedDockPadding);
+        else spacerParent.append(reservedDockPadding);
+        dockChanged = true;
       }
-      reservedBottomPadding = bottomPadding;
-      if (bottomPadding) {
-        previousBottomPaddingHeight = bottomPadding.style.getPropertyValue('height');
-        previousBottomPaddingPriority = bottomPadding.style.getPropertyPriority('height');
-        baseBottomPaddingHeight = Number.parseFloat(getComputedStyle(bottomPadding).height) || bottomPadding.offsetHeight || 0;
-        appliedBottomPaddingHeight = 0;
-        if (typeof ResizeObserver === 'function') {
-          bottomPaddingResizeObserver = new ResizeObserver(entries => {
-            if (reservationApplying) return;
-            const measuredHeight = entries[0]?.contentRect?.height;
-            if (Number.isFinite(measuredHeight) && Math.abs(measuredHeight - appliedBottomPaddingHeight) > 0.5) {
-              // Telegram changed its own padding (for example after a multiline
-              // composer resize). Keep that base and add only our dock height.
-              previousBottomPaddingHeight = bottomPadding.style.getPropertyValue('height');
-              previousBottomPaddingPriority = bottomPadding.style.getPropertyPriority('height');
-              baseBottomPaddingHeight = measuredHeight;
-              appliedBottomPaddingHeight = 0;
-              schedulePosition();
-            }
-          });
-          bottomPaddingResizeObserver.observe(bottomPadding);
-        }
+      const targetHeightText = `${dockHeight}px`;
+      if (reservedDockPadding.style.height !== targetHeightText) {
+        reservedDockPadding.style.height = targetHeightText;
+        dockChanged = true;
       }
-    }
-
-    if (reservedBottomPadding) {
-      const targetHeightText = `${Math.ceil(Math.max(0, baseBottomPaddingHeight) + dockHeight)}px`;
-      if (reservedBottomPadding.style.getPropertyValue('height') !== targetHeightText) {
-        reservationApplying = true;
-        reservedBottomPadding.style.setProperty('height', targetHeightText);
-        reservationApplying = false;
-      }
-      appliedBottomPaddingHeight = Number.parseFloat(targetHeightText);
-      preserveScrollAfterReserve(scroller, nearBottom);
+      preserveScrollAfterReserve(scroller, nearBottom && dockChanged);
     } else {
-      // Fallback for older Telegram Web layouts without the dedicated bottom spacer.
+      reservedDockPadding?.remove();
+      reservedDockPadding = null;
+      // Fallback for older Telegram Web layouts without a scrollable message container.
       const padding = `calc(${baseChatPadding} + ${dockHeight}px)`;
       usingChatPaddingFallback = true;
       if (appliedChatPadding !== padding || chat.style.getPropertyValue('--chat-padding-bottom') !== padding) {
