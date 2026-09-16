@@ -1,6 +1,6 @@
 (() => {
   const HOST_ID = 'telegram-atendimento-5-audio-bar';
-  const VERSION = '5.0.1';
+  const VERSION = '5.0.2';
   const LEGACY_HOST_ID = 'telegram-atendimento-4-audio-bar';
   const legacyHost = document.getElementById(LEGACY_HOST_ID);
   if (legacyHost) {
@@ -395,26 +395,29 @@
     if(Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
     event.preventDefault();itemsElement.scrollLeft+=event.deltaY;
   },{passive:false});
-  const dragState={pointerId:null,startX:0,startScroll:0,moved:false,suppressClick:false};
+  const dragState={pointerId:null,startX:0,startScroll:0,moved:false,captured:false,suppressClick:false};
   itemsElement.addEventListener('pointerdown',event=>{
     if (event.pointerType==='mouse'&&event.button!==0) return;
     if (itemsElement.scrollWidth-itemsElement.clientWidth<=3) return;
-    dragState.pointerId=event.pointerId;dragState.startX=event.clientX;dragState.startScroll=itemsElement.scrollLeft;dragState.moved=false;
-    itemsElement.classList.add('dragging');
-    try {itemsElement.setPointerCapture(event.pointerId);} catch {}
+    dragState.pointerId=event.pointerId;dragState.startX=event.clientX;dragState.startScroll=itemsElement.scrollLeft;dragState.moved=false;dragState.captured=false;
   });
   itemsElement.addEventListener('pointermove',event=>{
     if (dragState.pointerId!==event.pointerId) return;
     const distance=event.clientX-dragState.startX;
     if (Math.abs(distance)>5) dragState.moved=true;
     if (!dragState.moved) return;
+    if (!dragState.captured) {
+      dragState.captured=true;
+      itemsElement.classList.add('dragging');
+      try {itemsElement.setPointerCapture(event.pointerId);} catch {}
+    }
     event.preventDefault();itemsElement.scrollLeft=dragState.startScroll-distance;
   },{passive:false});
   const finishDrag=event=>{
     if (dragState.pointerId!==event.pointerId) return;
     const moved=dragState.moved;
-    try {if (itemsElement.hasPointerCapture(event.pointerId)) itemsElement.releasePointerCapture(event.pointerId);} catch {}
-    dragState.pointerId=null;dragState.moved=false;itemsElement.classList.remove('dragging');
+    try {if (dragState.captured && itemsElement.hasPointerCapture(event.pointerId)) itemsElement.releasePointerCapture(event.pointerId);} catch {}
+    dragState.pointerId=null;dragState.moved=false;dragState.captured=false;itemsElement.classList.remove('dragging');
     if (moved) {
       dragState.suppressClick=true;
       setTimeout(()=>{dragState.suppressClick=false;},0);
