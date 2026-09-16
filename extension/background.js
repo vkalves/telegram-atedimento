@@ -24,7 +24,8 @@ async function apiRequest(path, {method = 'GET', body} = {}) {
   if (url.origin !== connection.url) throw new Error('Endereço da instalação inválido.');
 
   const headers = {Authorization: `Bearer ${connection.token}`};
-  const options = {method, headers, signal: AbortSignal.timeout(path === '/health' ? 120000 : 30000)};
+  const timeout = path === '/health' || path === '/context' ? 120000 : 30000;
+  const options = {method, headers, signal: AbortSignal.timeout(timeout)};
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
