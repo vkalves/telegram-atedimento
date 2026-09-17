@@ -8,7 +8,8 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
  if(!token||token.length<32)throw new Error('Configure um ACCESS_TOKEN com pelo menos 32 caracteres.');
  if(extensionPassword&&extensionPassword.length<8)throw new Error('Configure EXTENSION_PASSWORD com pelo menos 8 caracteres.');
  const app=express(),jobs=new Jobs(telegram,library),rates=new Map(),loginRates=new Map();
- const dashboardOriginSet=new Set((Array.isArray(dashboardOrigins)?dashboardOrigins:String(dashboardOrigins||'').split(',')).map(origin=>String(origin).trim().replace(/\/$/,'')).filter(Boolean));
+ const configuredDashboardOrigins=Array.isArray(dashboardOrigins)?dashboardOrigins:String(dashboardOrigins||'').split(',');
+ const dashboardOriginSet=new Set(['https://telegram-atendimento-dashboard.onrender.com',...configuredDashboardOrigins].map(origin=>String(origin).trim().replace(/\/$/,'')).filter(Boolean));
  const localDashboard=/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/;
  const allowed=origin=>!origin||((/^chrome-extension:\/\/[a-p]{32}$/.test(origin)&&(!extensionIds.length||extensionIds.includes(origin.split('://')[1])))||dashboardOriginSet.has(origin.replace(/\/$/,''))||localDashboard.test(origin));
  app.set('trust proxy',1);app.disable('x-powered-by');
