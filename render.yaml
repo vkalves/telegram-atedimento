@@ -29,3 +29,9 @@ services:
         sync: false
       - key: SESSION_ENCRYPTION_KEY
         generateValue: true
+- type: web
+    name: telegram-atendimento-dashboard
+    runtime: static
+    staticPublishPath: ./dashboard
+    renderSubdomainPolicy: enabled
+    autoDeployTrigger: commit
