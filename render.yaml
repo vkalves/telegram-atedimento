@@ -29,7 +29,8 @@ services:
         sync: false
       - key: SESSION_ENCRYPTION_KEY
         generateValue: true
-- type: web
+
+  - type: web
     name: telegram-atendimento-dashboard
     runtime: static
     staticPublishPath: ./dashboard
