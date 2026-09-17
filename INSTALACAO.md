@@ -44,33 +44,24 @@ ACCESS_TOKEN é usado pelo dashboard. A extensão usa `EXTENSION_PASSWORD`.
 Depois que o serviço ficar **Live**, copie a URL HTTPS da API. O Render Free
 pode dormir após inatividade; o primeiro acesso pode levar algum tempo.
 
-## 3. Publicar o dashboard separadamente
+## 3. Publicar o dashboard
 
-No Render, crie um **Static Site** apontando para o mesmo repositório:
+O Blueprint `render.yaml` já declara o Static Site `telegram-atendimento-dashboard`
+junto com a API. Ao criar ou sincronizar o Blueprint no Render, confirme que os
+dois serviços foram aplicados. Se o endereço abrir `404 Not Found` com
+`no-server`, o Static Site ainda não foi sincronizado ou está sem publicação.
 
-- **Root Directory:** `dashboard`
+A configuração equivalente é:
+
+- **Root Directory:** vazio (raiz do repositório)
 - **Build Command:** vazio
-- **Publish Directory:** `.`
+- **Publish Directory:** `dashboard`
 
-Quando o endereço estiver disponível, informe a origem completa, sem barra no
-final, em `DASHBOARD_ORIGINS` no serviço web da API. Exemplo:
-
-```text
-https://telegram-atendimento-dashboard.onrender.com
-```
-
-Separe várias origens por vírgula. Faça novo deploy da API após salvar a
-variável. Para teste local, execute um servidor estático na pasta `dashboard`
-em `http://localhost:4173`; essa origem já é aceita pelo backend.
-
-No dashboard, informe a URL da API e o `ACCESS_TOKEN`. A interface permite
-adicionar, editar, excluir, ativar/desativar, reordenar, favoritar, pesquisar,
-categorizar, ouvir e substituir áudios. A alteração é persistida no Supabase
-pela API e a extensão consulta a biblioteca automaticamente.
-
-Na lateral do dashboard, clique em **Conectar conta** para concluir a
-autenticação do Telegram. O telefone, o código recebido e a senha 2FA são
-solicitados somente nessa interface administrativa.
+Se você mantiver um domínio diferente do padrão, informe a origem completa, sem
+barra no final, em `DASHBOARD_ORIGINS` no serviço web da API e faça novo deploy.
+O endereço padrão `https://telegram-atendimento-dashboard.onrender.com` já é
+aceito pela API. Para teste local, execute um servidor estático na pasta
+`dashboard` em `http://localhost:4173`; essa origem também é aceita.
 
 ## 4. Instalar a extensão
 
