@@ -15,20 +15,26 @@ python -m http.server 4173
 Abra `http://localhost:4173`, informe a URL HTTPS do Render e o `ACCESS_TOKEN`.
 O Render precisa aceitar `http://localhost:4173` na variável `DASHBOARD_ORIGINS`.
 
-## Publicar separadamente
+## Publicar com o Blueprint
 
-No Render, crie um **Static Site** apontando para o mesmo repositório:
+O arquivo `render.yaml` declara a API e o Static Site do dashboard. Ao criar ou
+sincronizar o Blueprint no Render, confirme que o serviço
+`telegram-atendimento-dashboard` foi aplicado e está servindo esta pasta.
 
-- **Root Directory:** `dashboard`
+A configuração equivalente é:
+
+- **Root Directory:** vazio (raiz do repositório)
 - **Build Command:** deixe vazio
-- **Publish Directory:** `.`
+- **Publish Directory:** `dashboard`
 
-Depois de o endereço do dashboard ficar disponível, adicione a origem completa,
-sem barra no final, em `DASHBOARD_ORIGINS` no serviço web da API. Para testar
-mais de um endereço, separe as origens por vírgula. Faça um novo deploy da API.
+Se o serviço já existir e o endereço retornar `404 Not Found` com
+`no-server`, sincronize/aplique o Blueprint ou ajuste essas configurações
+manualmente. Para um domínio diferente do padrão, inclua a origem completa em
+`DASHBOARD_ORIGINS` no serviço web da API. O endereço padrão
+`https://telegram-atendimento-dashboard.onrender.com` já é aceito.
 
-Também é possível publicar esta pasta em qualquer hospedagem de arquivos
-estáticos. O endereço usado precisa ser incluído em `DASHBOARD_ORIGINS`.
+Também é possível publicar esta pasta em outra hospedagem estática; nesse caso,
+inclua a origem usada em `DASHBOARD_ORIGINS`.
 
 ## Segurança
 
