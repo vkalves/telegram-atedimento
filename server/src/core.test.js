@@ -84,6 +84,7 @@ test('online API requires bearer token, accepts the extension password only from
   assert.equal((await fetch(base+'/health')).status,200);
   assert.equal((await fetch(base+'/library')).status,401);
   assert.equal((await fetch(base+'/library',{headers:{Authorization:'Bearer wrong'}})).status,401);
+  assert.equal((await fetch(base+'/library',{headers:{Authorization:'Bearer '+token,Origin:'https://telegram-atendimento-dashboard.onrender.com'}})).status,200);
   assert.equal((await fetch(base+'/library',{headers:{Authorization:'Bearer '+token,Origin:'https://example.com'}})).status,403);
   const passwordHeaders={Authorization:'Bearer '+extensionPassword,Origin:'chrome-extension://'+'a'.repeat(32)};
   assert.equal((await fetch(base+'/library',{headers:passwordHeaders})).status,200);
