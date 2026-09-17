@@ -1,6 +1,6 @@
 (() => {
   const HOST_ID = 'telegram-atendimento-5-audio-bar';
-  const VERSION = '5.0.4';
+  const VERSION = '5.0.5';
   const CONTEXT_RETRY_DELAYS = [1200, 3000, 7000];
   const LEGACY_HOST_ID = 'telegram-atendimento-4-audio-bar';
   const legacyHost = document.getElementById(LEGACY_HOST_ID);
@@ -55,7 +55,7 @@
     .items.dragging{scroll-behavior:auto;cursor:grabbing}
     .items::-webkit-scrollbar{height:4px}.items::-webkit-scrollbar-track{background:transparent}.items::-webkit-scrollbar-thumb{background:#615be1;border-radius:4px}
     .audio{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;width:max-content;max-width:none;height:38px;padding:0 13px;border-radius:8px;background:#075c7c;color:#23c9ff;box-shadow:inset 0 0 0 1px rgba(39,199,255,.08);transition:background .15s,transform .12s,color .15s;overflow:visible}
-    .audio:hover{background:#087399;color:#6edcff}.audio:active{transform:scale(.98)}.audio:disabled{opacity:.58;cursor:wait}
+    .audio:hover{background:#087399;color:#6edcff}.audio:active{transform:scale(.98)}.audio:disabled{opacity:.58;cursor:wait}.audio.unavailable{background:#3a4146;color:#aab3b8;cursor:not-allowed}
     .audio-icon{display:grid;place-items:center;flex:0 0 auto}.audio-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     .audio-label{display:block;overflow:visible;text-overflow:clip;max-width:none;white-space:nowrap}
     .message{max-width:160px;font-size:10px;color:#9da7ae;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
@@ -312,7 +312,8 @@
       const retry = document.createElement('button');retry.type='button';retry.className='setup';retry.textContent='Tentar novamente';retry.onclick=()=>{clearContextRetry();contextAttempt=0;state.error='';syncContext(true);};itemsElement.append(retry);
     } else {
       for (const item of state.items) {
-        const button = document.createElement('button');button.type='button';button.className='audio';button.title=`Enviar ${item.name}`;button.setAttribute('aria-label',`Enviar ${item.name}`);button.disabled=!state.target||!!busy;
+        const sendable = Boolean(item.storedName);
+        const button = document.createElement('button');button.type='button';button.className=`audio${sendable?'':' unavailable'}`;button.title=sendable?`Enviar ${item.name}`:`${item.name}: arquivo não disponível`;button.setAttribute('aria-label',sendable?`Enviar ${item.name}`:`${item.name}: arquivo não disponível`);button.disabled=!state.target||!!busy||!sendable;
         const icon=document.createElement('span');icon.className='audio-icon';icon.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>';const label=document.createElement('span');label.className='audio-label';label.textContent=item.name;button.append(icon,label);button.onclick=()=>sendItem(item);itemsElement.append(button);
       }
     }
@@ -333,7 +334,11 @@
     render();
     try {
       const data=await api('/library?kind=voice&active=true');
-      state.items=(data.items || []).filter(item => (item.kind || 'voice') === 'voice' && item.active !== false && item.storedName);
+      /* Keep active voice records visible even when an old/partial record is missing
+       its file marker. Hiding them as "Nenhum áudio ativo" concealed the repair
+       needed for that specific item. The render step disables only the unusable
+       record, so a missing file can never be sent accidentally. */
+      state.items=(data.items || []).filter(item => (item.kind || 'voice') === 'voice' && item.active !== false);
       state.error='';
     } catch (error) {state.error=error.message;}
     finally {state.loading=false;libraryBusy=false;render();}
@@ -370,6 +375,11 @@
 
   async function sendItem(item) {
     if (!state.target || inFlight.has(String(state.target.id))) return;
+    if (!item.storedName) {
+      feedback.set(String(state.target.id),{text:'Este áudio está sem arquivo no servidor.',type:'error',expiresAt:Date.now()+8000});
+      render();
+      return;
+    }
     const target=state.target,key=state.key,stamp=location.href;
     const requestId=crypto.randomUUID();
     inFlight.set(String(target.id),{jobId:null,requestId,label:item.name,startedAt:Date.now()});render();
