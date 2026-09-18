@@ -180,7 +180,10 @@
     else if (state.loading) setMessage('Carregando…');
     else if (state.error) setMessage(state.error, 'error');
     else if (!state.target) setMessage('Identificando…');
-    else if (busy) setMessage('Enviando…', 'success');
+    else if (busy) {
+      const flight=inFlight.get(String(state.target.id));
+      setMessage(flight?.phase==='recording'?'Gravando áudio…':'Enviando…', 'success');
+    }
     else if (!state.items.length) setMessage('Nenhum áudio ativo');
     else setMessage('');
 
@@ -249,17 +252,23 @@
   async function sendItem(item) {
     if (!state.target || inFlight.has(String(state.target.id))) return;
     const target=state.target,key=state.key,stamp=location.href;
+    const confirmed=window.confirm(`Enviar o áudio "${item.name}" para ${target.name || 'esta conversa'}?`);
+    if (!confirmed) return;
     const requestId=crypto.randomUUID();
-    inFlight.set(String(target.id),{jobId:null,requestId,label:item.name,startedAt:Date.now()});render();
+    inFlight.set(String(target.id),{jobId:null,requestId,label:item.name,phase:'recording',startedAt:Date.now()});render();
+    setTimeout(()=>{
+      const current=inFlight.get(String(target.id));
+      if(current?.requestId===requestId){current.phase='sending';render();}
+    },4000);
     try {
       const freshKey=peerFromURL(location.href);
       if (freshKey !== key || stamp !== location.href) throw new Error('A conversa mudou. Escolha o áudio novamente.');
-      const data=await api('/jobs',{method:'POST',body:{requestId,dialogId:String(target.id),peerKey:key,steps:[{id:item.id,delay:0}],label:item.name}});
+      const data=await api('/jobs',{method:'POST',body:{requestId,dialogId:String(target.id),peerKey:key,steps:[{id:item.id,delay:0,recordingDelay:4}],label:item.name}});
       const job=data.job;
       if (!job?.id) throw new Error('O servidor não confirmou o envio.');
       const current=inFlight.get(String(target.id));
-      inFlight.set(String(target.id),{jobId:job.id,requestId,label:item.name,startedAt:current?.startedAt||Date.now()});
-      setMessage('Enviando…','success');
+      inFlight.set(String(target.id),{jobId:job.id,requestId,label:item.name,phase:current?.phase||'recording',startedAt:current?.startedAt||Date.now()});
+      setMessage(current?.phase==='sending'?'Enviando…':'Gravando áudio…','success');
       void reconcileJobs();
     } catch (error) {
       inFlight.delete(String(target.id));feedback.set(String(target.id),{text:error.message,type:'error',expiresAt:Date.now()+8000});render();

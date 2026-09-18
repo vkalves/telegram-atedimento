@@ -22,6 +22,12 @@ test('voice includes duration and voice attribute; success requires a Telegram m
   assert.equal((await service.sendItem({path:'/x.ogg',duration:7.8,kind:'voice'},{dialogId:'11'})).messageId,'99');assert.equal(options.voiceNote,true);assert.equal(options.attributes[0].voice,true);assert.equal(options.attributes[0].duration,8);
   service.client.sendFile=async()=>undefined;await assert.rejects(service.sendItem({path:'/x.ogg'},{dialogId:'11'}),/não confirmou/);
 });
+test('voice can show Telegram recording status before it is sent',async()=>{
+  const service=new TelegramService({apiId:1,apiHash:'test',dataDir:'/unused'});service.resolveTarget=async()=>({id:11n});const calls=[];
+  service.client={invoke:async request=>calls.push(request),sendFile:async()=>{calls.push('sent');return{id:100};}};
+  await service.sendItem({path:'/x.ogg',duration:2,kind:'voice'},{dialogId:'11'},{recordingDelay:.001});
+  assert.equal(calls.length,2);assert.equal(calls[0].action.className,'SendMessageRecordAudioAction');assert.equal(calls[1],'sent');
+});
 test('flood waits stop the authentication retry loop and preserve the wait message',async()=>{
  const service=new TelegramService({apiId:1,apiHash:'test',dataDir:'/unused'});let attempts=0,shouldStop;
  service.client={checkAuthorization:async()=>false,start:async({onError})=>{attempts++;shouldStop=onError({errorMessage:'FLOOD_WAIT_42'});if(shouldStop)throw new Error('AUTH_USER_CANCEL');}};

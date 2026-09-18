@@ -345,7 +345,7 @@ export class TelegramService {
     }
   }
 
-  async sendItem(item, target) {
+  async sendItem(item, target, {recordingDelay = 0} = {}) {
     const entity = await this.resolveTarget(target);
     let result;
     if (item.kind === "text") {
@@ -358,6 +358,14 @@ export class TelegramService {
         options.attributes = [new Api.DocumentAttributeAudio({
           voice: true, duration: Math.max(1, Math.round(item.duration || 1))
         })];
+        const delayMs = Math.min(15000, Math.max(0, Number(recordingDelay) * 1000 || 0));
+        if (delayMs) {
+          await this.client.invoke(new Api.messages.SetTyping({
+            peer: entity,
+            action: new Api.SendMessageRecordAudioAction()
+          }));
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
       }
       if (item.kind === 'video') {
         options.supportsStreaming = true;

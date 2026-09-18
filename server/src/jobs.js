@@ -8,7 +8,7 @@ export class Jobs {
     if(this.jobs.has(requestId))return this.get(requestId);
     if(!/^-?\d+$/.test(String(dialogId || '')))throw new Error('Selecione uma conversa válida.');
     if(!Array.isArray(steps)||!steps.length||steps.length>30)throw new Error('Use entre 1 e 30 etapas.');
-    for(const s of steps)if(typeof s.id!=='string'||!Number.isFinite(s.delay)||s.delay<0||s.delay>3600)throw new Error('Etapa inválida.');
+    for(const s of steps)if(typeof s.id!=='string'||!Number.isFinite(s.delay)||s.delay<0||s.delay>3600||(s.recordingDelay!==undefined&&(!Number.isFinite(s.recordingDelay)||s.recordingDelay<0||s.recordingDelay>15)))throw new Error('Etapa inválida.');
     if([...this.jobs.values()].some(j=>j.dialogId===String(dialogId)&&j.state==='running'))throw new Error('Já existe um envio nesta conversa. Aguarde ou pare a sequência.');
     for(const [id,j] of this.jobs)if(j.state!=='running'&&Date.now()-j.updatedAt>86400000)this.jobs.delete(id);
     const job={id:requestId,dialogId:String(dialogId),label:String(input.label||'Envio').slice(0,80),targetName:String(input.targetName||dialogId).slice(0,120),steps:structuredClone(steps),state:'running',sent:0,total:steps.length,messageIds:[],error:null,phase:'Preparando',updatedAt:Date.now(),controller:new AbortController()};
@@ -26,7 +26,7 @@ export class Jobs {
           await new Promise(resolve=>{const done=()=>{clearTimeout(timer);job.controller.signal.removeEventListener('abort',done);resolve();};const timer=setTimeout(done,job.steps[i].delay*1000);job.controller.signal.addEventListener('abort',done,{once:true});});}
         if(job.controller.signal.aborted)break;
         job.phase=`Enviando ${i+1}/${items.length}`;
-        const result=await this.telegram.sendItem(items[i],{dialogId:job.dialogId});
+        const result=await this.telegram.sendItem(items[i],{dialogId:job.dialogId},{recordingDelay:job.steps[i].recordingDelay||0});
         job.sent++;job.messageIds.push(result.messageId);job.updatedAt=Date.now();
       }
       job.state=job.controller.signal.aborted?'cancelled':'done';
