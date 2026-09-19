@@ -9,13 +9,16 @@ export class SupabaseStore {
   this.url=parsed.origin;this.key=key;this.bucket=bucket;this.fetch=fetchImpl;
   if(!key)throw new Error('Configure SUPABASE_SERVICE_ROLE_KEY no Render.');
  }
- async request(route,{method='GET',headers={},body,raw=false}={}){
+ async request(route,{method='GET',headers={},body,raw=false,safeErrors=[]}={}){
   const auth={apikey:this.key};
   // JWT service_role uses Bearer; the newer sb_secret key is sent only as apikey.
   if(!this.key.startsWith('sb_secret_'))auth.Authorization='Bearer '+this.key;
   let response;
   try{response=await this.fetch(this.url+route,{method,headers:{...auth,...headers},body,signal:AbortSignal.timeout(90000)});}catch{throw new Error('Supabase não respondeu. Confira o projeto e a conexão.');}
-  if(!response.ok)throw new Error(`Supabase retornou ${response.status}. Confira o SQL, a chave secreta, o projeto ativo e a cota de armazenamento.`);
+  if(!response.ok){
+   if(safeErrors.length){const detail=await response.json().catch(()=>null);if(detail?.code==='P0001'&&safeErrors.includes(detail.message))throw new Error(detail.message);}
+   throw new Error(`Supabase retornou ${response.status}. Confira o SQL, a chave secreta, o projeto ativo e a cota de armazenamento.`);
+  }
   if(raw)return response;
   return response.status===204?null:await response.json();
  }

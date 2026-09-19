@@ -21,8 +21,8 @@ const telegram=new TelegramService({apiId,apiHash,dataDir,encryptionKey:encrypti
 try{
  await library.init();await sequences.init();await categories.init();await telegram.init();
  let flows=null,flowWorker=null;
- try{flows=new FlowStore(store);await flows.list();flowWorker=new FlowWorker({flows,telegram,library});flowWorker.start();}
- catch{flows=null;console.error("Fluxos desabilitados: aplique supabase/FLUXOS-PARTE-1.sql e reinicie. Atendimento existente preservado.");}
+ try{flows=new FlowStore(store);await flows.init();flowWorker=new FlowWorker({flows,telegram,library});flowWorker.start();}
+ catch{flows=null;console.error("Fluxos desabilitados: aplique as migrações FLUXOS-PARTE-1.sql e FLUXOS-PARTE-2.sql, nesta ordem, e reinicie. Atendimento existente preservado.");}
  const app=createApp({flows,telegram,library,sequences,categories,token,extensionPassword,extensionIds:(process.env.EXTENSION_IDS||'').split(',').map(s=>s.trim()).filter(Boolean),dashboardOrigins:(process.env.DASHBOARD_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean)});
  const server=app.listen(port,'0.0.0.0',()=>console.log(`Telegram Atendimento 4.0 online na porta ${port}`));
  server.on('error',e=>{console.error(e.message);process.exit(1);});

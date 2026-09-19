@@ -345,6 +345,35 @@ export class TelegramService {
     }
   }
 
+  // Durable waiting uses Telegram history, not browser events or untrusted webhooks.
+  async flowReplyBaseline(dialogId) {
+    const entity=await this.resolveTarget({dialogId});
+    if(entity?.className!=='User')throw new Error('A espera aceita somente conversas privadas.');
+    const me=await this.client.getMe();
+    const messages=await this.client.getMessages(entity,{limit:1});
+    return {accountId:String(me.id),cursor:Number(messages[0]?.id||0)};
+  }
+
+  async flowReplyPage(run) {
+    const entity=await this.resolveTarget({dialogId:run.dialog_id});
+    if(entity?.className!=='User')throw new Error('Conversa privada não localizada.');
+    const me=await this.client.getMe();
+    if(String(me.id)!==run.reply_account_id)throw new Error('A conta Telegram mudou. Reconecte a conta original para continuar.');
+    const checkedAt=new Date().toISOString();
+    // Ascending pagination prevents losing a reply behind a large offline backlog.
+    const rows=await this.client.getMessages(entity,{limit:100,minId:Number(run.reply_cursor||0),reverse:true});
+    let cursor=Number(run.reply_cursor||0);const messages=[];
+    for(const message of rows){
+      if(!Number.isSafeInteger(message.id)||message.id<=0)continue;
+      const dialog=message.peerId?.userId?.toString(),sender=message.fromId?.userId?.toString()||message.senderId?.toString();
+      if(dialog!==run.dialog_id)throw new Error('O Telegram retornou histórico de outra conversa. Consulta interrompida.');
+      cursor=Math.max(cursor,message.id);
+      if(message.className!=='Message'||message.out||dialog!==run.dialog_id||sender!==run.dialog_id||!Number.isFinite(message.date))continue;
+      messages.push({id:message.id,date:message.date,dialogId:dialog,senderId:sender});
+    }
+    return {accountId:String(me.id),messages,cursor,complete:rows.length<100,checkedAt};
+  }
+
   async sendItem(item, target, {recordingDelay = 0} = {}) {
     const entity = await this.resolveTarget(target);
     let result;

@@ -1,6 +1,6 @@
 (() => {
   const HOST_ID = 'telegram-atendimento-5-audio-bar';
-  const VERSION = '5.1.0';
+  const VERSION = '5.2.0';
   const CONTEXT_RETRY_DELAYS = [1200, 3000, 7000];
   const LEGACY_HOST_ID = 'telegram-atendimento-4-audio-bar';
   const legacyHost = document.getElementById(LEGACY_HOST_ID);
@@ -83,7 +83,7 @@
   const inFlight = new Map();
   let availableFlows=[],flowRuns=[],flowSelected='',flowBusy=false,flowLoading=false,flowError='';
   const flowRequests=new Map();
-  const activeFlow=()=>flowRuns.find(run=>run.dialog_id===String(state.target?.id)&&['running','waiting','sending','uncertain'].includes(run.status));
+  const activeFlow=()=>flowRuns.find(run=>run.dialog_id===String(state.target?.id)&&['running','waiting','sending','uncertain','arming_reply','awaiting_reply','paused'].includes(run.status));
   async function loadFlows(){
     if(!state.configured||flowLoading)return;flowLoading=true;
     const targetId=state.target?.id;
@@ -104,13 +104,30 @@
     const start=document.createElement('button');start.type='button';start.className='audio';start.textContent=run?'Fluxo em andamento':'Iniciar fluxo';start.disabled=flowBusy||!!run||!flowSelected||!availableFlows.some(f=>f.id===flowSelected);start.title=flowError||'Executar na conversa atual';start.onclick=startFlow;
     itemsElement.prepend(select,start);
     if(flowError){const note=document.createElement('span');note.textContent='Fluxos indisponíveis';note.title=flowError;itemsElement.append(note);}
-    if(run){
-      const status=document.createElement('span');status.textContent=`${run.status==='uncertain'?'Conferir envio':run.status==='waiting'?'Esperando':'Executando'} · ${run.current_step+1}/${run.snapshot.steps.length}`;
-      const cancel=document.createElement('button');cancel.type='button';cancel.className='audio';cancel.textContent='Parar fluxo';cancel.disabled=flowBusy;cancel.onclick=async()=>{
-        if(!confirm(run.status==='uncertain'?'O envio pode ter ocorrido. Confira a conversa antes de encerrar. Encerrar sem reenviar?':'Interromper o fluxo? O envio em andamento poderá terminar.'))return;
-        flowBusy=true;render();try{await api('/flow-runs/'+run.id+'/cancel',{method:'POST'});await loadFlows();}catch(error){feedback.set(String(state.target?.id),{text:error.message,type:'error',expiresAt:Date.now()+10000});}finally{flowBusy=false;render();}
-      };itemsElement.append(status,cancel);
+    const shown=run||flowRuns.find(item=>item.dialog_id===String(state.target.id));
+    if(shown){
+      const labels={running:'executando',waiting:'aguardando tempo',sending:'enviando',arming_reply:'preparando espera',awaiting_reply:'aguardando resposta',paused:'pausado',done:'concluído',cancelled:'cancelado',error:'erro',uncertain:'conferir envio'};
+      const status=document.createElement('span');status.style.cssText='white-space:nowrap;flex:0 0 auto;font-size:11px';
+      status.textContent=`Fluxo ${run?'ativo':'recente'}: ${shown.snapshot.name} · Status: ${labels[shown.status]||shown.status} · Etapa atual: ${Math.min(shown.current_step+1,shown.snapshot.steps.length)} de ${shown.snapshot.steps.length}${shown.pause_requested?' · Pausa pendente':''}${shown.human_takeover?' · Atendimento humano':''}`;
+      status.title=shown.error||status.textContent;itemsElement.append(status);
+      const actions=[];
+      if(run&&run.status!=='uncertain')actions.push(run.status==='paused'?['resume','Continuar fluxo']:['pause','Pausar fluxo'],['human','Assumir atendimento']);
+      if(run)actions.push(['cancel','Cancelar fluxo']);
+      if(run&&!['sending','uncertain'].includes(run.status))actions.push(['skip','Pular etapa']);
+      if(!['sending','uncertain'].includes(shown.status))actions.push(['restart','Reiniciar fluxo']);
+      for(const [action,label] of actions){const control=document.createElement('button');control.type='button';control.className='audio';control.textContent=label;control.disabled=flowBusy;control.onclick=()=>controlFlow(shown,action);itemsElement.append(control);}
     }
+  }
+  const flowCommands=new Map();
+  async function controlFlow(run,action){
+    if(flowBusy)return;
+    const questions={restart:'Reiniciar do começo? Mensagens já enviadas poderão ser enviadas novamente.',skip:'Pular a etapa atual desta execução?',cancel:run.status==='uncertain'?'Confira o envio incerto antes de cancelar. Cancelar?':'Cancelar esta execução? Um envio em andamento poderá terminar.'};
+    if(questions[action]&&!confirm(questions[action]))return;
+    const key=run.id+':'+action;if(!flowCommands.has(key))flowCommands.set(key,crypto.randomUUID());
+    flowBusy=true;render();
+    try{await api('/flow-runs/'+run.id+'/control',{method:'POST',body:{action,version:run.control_version,requestId:flowCommands.get(key)}});flowCommands.delete(key);await loadFlows();}
+    catch(error){feedback.set(run.dialog_id,{text:error.message,type:'error',expiresAt:Date.now()+10000});}
+    finally{flowBusy=false;render();}
   }
   async function startFlow(){
     if(flowBusy||!state.target||!flowSelected||activeFlow())return;

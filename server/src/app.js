@@ -66,7 +66,7 @@ export function createApp({telegram,library,sequences,categories=null,flows=null
  app.patch('/categories/:id',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({category:await categories.rename(q.params.id,q.body)});});
  app.delete('/categories/:id',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({ok:await categories.remove(q.params.id)});});
  // Fluxos são opcionais para preservar instalações durante a migração SQL.
- app.use(['/flows','/flow-runs'],(_q,r,next)=>flows?next():r.status(503).json({error:'Aplique FLUXOS-PARTE-1.sql e reinicie o servidor para habilitar os fluxos.'}));
+ app.use(['/flows','/flow-runs'],(_q,r,next)=>flows?next():r.status(503).json({error:'Aplique as migrações das Partes 1 e 2 e reinicie o servidor para habilitar os fluxos.'}));
  app.get('/flows',async(_q,r)=>r.json({flows:await flows.list()}));
  app.post('/flows',async(q,r)=>r.json({flow:await flows.save(q.body,library)}));
  app.patch('/flows/:id',async(q,r)=>r.json({flow:await flows.save(q.body,library,q.params.id)}));
@@ -78,6 +78,7 @@ export function createApp({telegram,library,sequences,categories=null,flows=null
   if(target.id!==String(q.body.dialogId))throw new Error('A conversa mudou. Selecione o fluxo novamente.');
   r.json({run:await flows.start(q.body,target)});
  });
+ app.post('/flow-runs/:id/control',async(q,r)=>r.json({run:await flows.control(q.params.id,q.body)}));
  app.post('/flow-runs/:id/cancel',async(q,r)=>r.json({run:await flows.cancel(q.params.id)}));
  app.get('/sequences',async(_q,r)=>r.json({sequences:await sequences.list()}));
  app.post('/sequences',async(q,r)=>r.json({sequence:await sequences.save(q.body)}));

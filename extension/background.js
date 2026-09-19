@@ -6,7 +6,7 @@ function isTelegramSender(sender) {
 }
 
 function isSupportedPath(path) {
-  return /^\/(?:health|context|flows|flow-runs(?:\?.*|\/[^/]+\/cancel)?|library(?:\?.*)?|jobs(?:\/[^/]+\/cancel)?)$/.test(path);
+  return /^\/(?:health|context|flows|flow-runs(?:\?.*|\/[^/]+\/(?:cancel|control))?|library(?:\?.*)?|jobs(?:\/[^/]+\/cancel)?)$/.test(path);
 }
 
 async function getConnection() {

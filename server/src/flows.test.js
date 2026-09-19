@@ -45,3 +45,14 @@ test('flow REST adapter sends only server-authenticated calls and guards update 
  assert.match(calls[0][0],/revision=eq.2/);
  assert.throws(()=>flows.runs('1&select=*'),/inválida/);
 });
+
+test('worker initialization fails closed when Parte 2 database capability is unavailable',async()=>{
+ const unavailable=new FlowStore({request:async route=>{if(route.includes('capabilities'))throw Error('DB offline');return [];}});
+ await assert.rejects(unavailable.init(),/DB offline/);assert.equal(unavailable.version,1);
+ const ready=new FlowStore({request:async route=>route.includes('capabilities')?{version:2}:[]});await ready.init();assert.equal(ready.version,2);
+});
+
+
+test('single-run RPCs normalize PostgREST composite rows without flattening work queues',async()=>{
+ const row={id:'run'};const flows=new FlowStore({request:async()=>[row]});assert.deepEqual(await flows.rpc('start'),row);assert.deepEqual(await flows.rpc('control'),row);assert.deepEqual(await flows.claim(),[row]);assert.deepEqual(await flows.watch(),[row]);
+});
