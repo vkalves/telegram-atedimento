@@ -1,17 +1,26 @@
 const TELEGRAM_WEB = 'https://web.telegram.org/';
+const DEFAULT_DASHBOARD_URL = 'https://telegram-atendimento-dashboard.onrender.com';
 
 function isTelegramSender(sender) {
   return sender?.tab?.url?.startsWith(TELEGRAM_WEB);
 }
 
 function isSupportedPath(path) {
-  return /^\/(?:health|context|library(?:\?.*)?|jobs(?:\/[^/]+\/cancel)?)$/.test(path);
+  return /^\/(?:health|context|flows|flow-runs(?:\?.*|\/[^/]+\/cancel)?|library(?:\?.*)?|jobs(?:\/[^/]+\/cancel)?)$/.test(path);
 }
 
 async function getConnection() {
   const {connection} = await chrome.storage.local.get('connection');
   if (!connection?.url || !connection?.token) return null;
   return connection;
+}
+
+function dashboardUrl(value) {
+  try {
+    const url = new URL(value || DEFAULT_DASHBOARD_URL);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return DEFAULT_DASHBOARD_URL;
+    return url.href.replace(/\/$/, '');
+  } catch { return DEFAULT_DASHBOARD_URL; }
 }
 
 async function apiRequest(path, {method = 'GET', body} = {}) {
@@ -24,6 +33,9 @@ async function apiRequest(path, {method = 'GET', body} = {}) {
   if (url.origin !== connection.url) throw new Error('Endereço da instalação inválido.');
 
   const headers = {Authorization: `Bearer ${connection.token}`};
+  // Waking the Render service and resolving a Telegram username can take
+  // longer than the ordinary library request. Do not abort context discovery
+  // while the server is still completing that first request.
   const timeout = path === '/health' || path === '/context' ? 120000 : 30000;
   const options = {method, headers, signal: AbortSignal.timeout(timeout)};
   if (body !== undefined) {
@@ -50,6 +62,14 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
 
   if (message?.type === 'open-options') {
     chrome.runtime.openOptionsPage().then(() => reply({ok:true})).catch(error => reply({error:error.message}));
+    return true;
+  }
+
+  if (message?.type === 'open-dashboard') {
+    getConnection()
+      .then(connection => chrome.tabs.create({url:dashboardUrl(connection?.dashboardUrl)}))
+      .then(() => reply({ok:true}))
+      .catch(error => reply({ok:false,error:error.message || 'Não foi possível abrir o dashboard.'}));
     return true;
   }
 
