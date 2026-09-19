@@ -1,3 +1,4 @@
+import {setupFlows} from './flows.js';
 const $ = id => document.getElementById(id);
 const connectionStorageKey = 'telegram-atendimento-4-dashboard-connection';
 const state = {connection:null,items:[],categories:[],view:'library',favoriteOnly:false,editingAudio:null,editingCategory:null,localPreviewUrl:null,previewUrl:null,toastTimer:null,loading:false,telegramAuthBusy:false,telegramStatusBusy:false,telegramPoll:null};
@@ -261,7 +262,8 @@ async function deleteCategory(category) {
 }
 
 function setView(view) {
-  state.view=view;$('libraryView').hidden=view!=='library';$('categoriesView').hidden=view!=='categories';$('pageTitle').textContent=view==='library'?'Organize seu atendimento':'Categorias da biblioteca';
+  $('flowsView').hidden=view!=='flows';if(view==='flows')void flowUI.refresh();
+  state.view=view;$('libraryView').hidden=view!=='library';$('categoriesView').hidden=view!=='categories';$('pageTitle').textContent=view==='library'?'Organize seu atendimento':view==='flows'?'Fluxos de mensagens':'Categorias da biblioteca';
   document.querySelectorAll('.nav-item').forEach(item=>item.classList.toggle('active',item.dataset.view===view));$('sidebar').classList.remove('open');
 }
 
@@ -278,6 +280,8 @@ async function start() {
   $('connectionUrl').value=state.connection.url||'';$('connectionToken').value=state.connection.token||'';showApp();
   try{await loadData();await loadTelegramStatus();}catch(error){showConnectionGate(error.message);}
 }
+
+const flowUI=setupFlows({api,element,button,showToast,getItems:()=>state.items});
 
 $('connectionForm').addEventListener('submit',connect);
 $('audioForm').addEventListener('submit',saveAudio);

@@ -1,15 +1,40 @@
 {
- "manifest_version":3,
- "name":"Telegram Atendimento 4",
- "version":"4.0.3",
- "minimum_chrome_version":"116",
- "description":"Barra compacta para enviar áudios como mensagem de voz no Telegram Web.",
- "permissions":["storage"],
- "host_permissions":["https://web.telegram.org/*"],
- "optional_host_permissions":["https://*/*"],
- "background":{"service_worker":"background.js"},
- "options_page":"options.html",
- "action":{"default_title":"Configurar Telegram Atendimento"},
- "content_scripts":[{"matches":["https://web.telegram.org/*"],"js":["content.js"],"run_at":"document_idle"}],
- "icons":{"16":"icons/icon16.png","32":"icons/icon32.png","48":"icons/icon48.png","128":"icons/icon128.png"}
+  "manifest_version": 3,
+  "name": "Telegram Atendimento 5",
+  "version": "5.1.0",
+  "minimum_chrome_version": "116",
+  "description": "Barra prática para enviar áudios como mensagem de voz no Telegram Web.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://web.telegram.org/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Configurar Telegram Atendimento"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://web.telegram.org/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

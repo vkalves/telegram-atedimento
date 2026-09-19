@@ -4,7 +4,7 @@ import multer from 'multer';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import {Jobs} from './jobs.js';
-export function createApp({telegram,library,sequences,categories=null,token,extensionPassword='',extensionIds=[],dashboardOrigins=[]}){
+export function createApp({telegram,library,sequences,categories=null,flows=null,token,extensionPassword='',extensionIds=[],dashboardOrigins=[]}){
  if(!token||token.length<32)throw new Error('Configure um ACCESS_TOKEN com pelo menos 32 caracteres.');
  if(extensionPassword&&extensionPassword.length<8)throw new Error('Configure EXTENSION_PASSWORD com pelo menos 8 caracteres.');
  const app=express(),jobs=new Jobs(telegram,library),rates=new Map(),loginRates=new Map();
@@ -65,6 +65,20 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
  app.post('/categories',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({category:await categories.add(q.body)});});
  app.patch('/categories/:id',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({category:await categories.rename(q.params.id,q.body)});});
  app.delete('/categories/:id',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({ok:await categories.remove(q.params.id)});});
+ // Fluxos são opcionais para preservar instalações durante a migração SQL.
+ app.use(['/flows','/flow-runs'],(_q,r,next)=>flows?next():r.status(503).json({error:'Aplique FLUXOS-PARTE-1.sql e reinicie o servidor para habilitar os fluxos.'}));
+ app.get('/flows',async(_q,r)=>r.json({flows:await flows.list()}));
+ app.post('/flows',async(q,r)=>r.json({flow:await flows.save(q.body,library)}));
+ app.patch('/flows/:id',async(q,r)=>r.json({flow:await flows.save(q.body,library,q.params.id)}));
+ app.delete('/flows/:id',async(q,r)=>r.json({ok:await flows.remove(q.params.id)}));
+ app.get('/flow-runs',async(q,r)=>r.json({runs:await flows.runs(q.query.dialogId)}));
+ app.get('/flow-runs/:id/logs',async(q,r)=>r.json({logs:await flows.logs(q.params.id)}));
+ app.post('/flow-runs',async(q,r)=>{
+  const target=await telegram.currentTarget(String(q.body.peerKey||''));
+  if(target.id!==String(q.body.dialogId))throw new Error('A conversa mudou. Selecione o fluxo novamente.');
+  r.json({run:await flows.start(q.body,target)});
+ });
+ app.post('/flow-runs/:id/cancel',async(q,r)=>r.json({run:await flows.cancel(q.params.id)}));
  app.get('/sequences',async(_q,r)=>r.json({sequences:await sequences.list()}));
  app.post('/sequences',async(q,r)=>r.json({sequence:await sequences.save(q.body)}));
  app.delete('/sequences/:id',async(q,r)=>r.json({ok:await sequences.remove(q.params.id)}));
