@@ -31,6 +31,7 @@
       <nav class="navigation" aria-label="Navegação do dashboard">
         <button class="nav-item active" data-view="library" type="button"><span class="nav-icon">▦</span> Biblioteca <span id="navAudioCount" class="nav-count">0</span></button>
         <button class="nav-item" data-view="categories" type="button"><span class="nav-icon">▤</span> Categorias</button>
+      <button class="nav-item" data-view="flows" type="button"><span class="nav-icon">↳</span> Fluxos</button>
       </nav>
       <div class="telegram-card"><div class="telegram-card-heading"><span id="telegramStatusDot" class="telegram-dot loading"></span><div><strong id="telegramStatusText">Verificando Telegram…</strong><small id="telegramAccountText">Aguarde um instante</small></div></div><button id="connectTelegram" class="sidebar-action" type="button">Conectar conta</button></div>
       <div class="sidebar-bottom">
@@ -73,6 +74,10 @@
           <div id="categoryList" class="category-list"></div>
         </section>
       </section>
+      <section id="flowsView" class="view" hidden>
+        <section class="content-card"><div class="section-heading"><div><h2>Fluxos de mensagens</h2><p class="muted">Combine textos, áudios, esperas e respostas do lead. Inicie pela conversa no Telegram.</p></div><button id="newFlow" class="primary" type="button">+ Novo fluxo</button></div><p id="flowError" class="form-error" role="alert"></p><div id="flowList"></div></section>
+        <section class="content-card"><div class="section-heading"><div><h2>Execuções por conversa</h2><p class="muted">As últimas 100 execuções. O servidor continua mesmo com este dashboard fechado.</p></div><button id="refreshFlows" class="secondary-button" type="button">Atualizar</button></div><div id="flowRuns" aria-live="polite"></div></section>
+      </section>
     </main>
   </div>
 
@@ -84,6 +89,8 @@
 
   <dialog id="telegramDialog" class="modal small-modal"><form id="telegramForm"><div class="modal-heading"><div><p class="eyebrow">AUTENTICAÇÃO</p><h2>Conta do Telegram</h2></div><button id="closeTelegram" class="icon-button" type="button" aria-label="Fechar">×</button></div><p id="telegramDialogMessage" class="muted">Use a mesma conta que será atendida pela extensão.</p><div id="telegramPhoneStep"><label>Telefone com DDI<input id="telegramPhone" type="tel" placeholder="+5511999999999" autocomplete="tel"></label><button id="startTelegramLogin" class="primary wide" type="button">Receber código</button></div><div id="telegramCodeStep" hidden><label>Código recebido no Telegram<input id="telegramCode" inputmode="numeric" autocomplete="one-time-code"></label><button id="submitTelegramCode" class="primary wide" type="button">Confirmar código</button></div><div id="telegramPasswordStep" hidden><label>Senha de duas etapas<input id="telegramPassword" type="password" autocomplete="off"></label><button id="submitTelegramPassword" class="primary wide" type="button">Conectar conta</button></div><p id="telegramError" class="form-error" role="alert"></p><div class="modal-actions"><button id="cancelTelegram" class="secondary-button" type="button">Fechar</button></div></form></dialog>
 
+  <dialog id="flowDialog" class="modal flow-editor"><form id="flowForm"><div class="modal-heading"><h2>Editar fluxo</h2><button id="closeFlow" class="icon-button" type="button" aria-label="Fechar">×</button></div><label>Nome<input id="flowName" required maxlength="80"></label><label class="flow-check"><input id="flowActive" type="checkbox" checked>Fluxo ativo</label><div id="flowSteps"></div><div class="flow-actions"><button id="addFlowtext" class="secondary-button" type="button">+ Texto</button><button id="addFlowaudio" class="secondary-button" type="button">+ Áudio</button><button id="addFlowwait" class="secondary-button" type="button">+ Espera</button><button id="addFlowreply" class="secondary-button" type="button">+ Esperar resposta</button></div><p class="muted">Esperas em segundos. Alterações valem para novas execuções.</p><p id="flowSaveError" class="form-error" role="alert"></p><button id="saveFlow" class="primary" type="submit">Salvar fluxo</button></form></dialog>
+  <dialog id="flowLogDialog" class="modal"><div class="modal-heading"><h2>Histórico da execução</h2><button id="closeFlowLogs" class="icon-button" type="button" aria-label="Fechar">×</button></div><pre id="flowLogContent"></pre></dialog>
   <div id="toast" class="toast" role="status"></div>
   <script type="module" src="app.js"></script>
 </body>

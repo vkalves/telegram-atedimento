@@ -24,3 +24,12 @@ test('private media downloads use the authenticated route and stream to disk',as
   assert.match(called,/\/object\/authenticated\/ta-media\/abc-123.ogg$/);assert.equal(await fs.readFile(file,'utf8'),'audio-bytes');
  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
+
+
+test('only allowlisted SQL application errors are exposed by flow controls',async()=>{
+ const message='Execução mudou. Atualize antes de repetir o comando.';
+ const store=new SupabaseStore({url:'https://example.supabase.co',key:'test',fetchImpl:async()=>new Response(JSON.stringify({code:'P0001',message}),{status:400})});
+ await assert.rejects(store.request('/rest/v1/rpc/ta_flow_control',{safeErrors:[message]}),e=>e.message===message);
+ store.fetch=async()=>new Response(JSON.stringify({code:'P0001',message:'private provider details'}),{status:400});
+ await assert.rejects(store.request('/rest/v1/rpc/ta_flow_control',{safeErrors:[message]}),e=>!e.message.includes('private provider'));
+});

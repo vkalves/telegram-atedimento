@@ -6,6 +6,7 @@ import {VoiceLibrary} from './library.js';
 import {Sequences} from './sequences.js';
 import {CategoryStore} from './categories.js';
 import {createApp} from './app.js';
+import {FlowStore,FlowWorker} from './flows.js';
 import {SupabaseStore} from './supabase-store.js';
 const dataDir=path.resolve(process.env.DATA_DIR||'./data'),port=Number(process.env.PORT||8080);
 const apiId=process.env.TELEGRAM_API_ID,apiHash=process.env.TELEGRAM_API_HASH,token=process.env.ACCESS_TOKEN,extensionPassword=(process.env.EXTENSION_PASSWORD||'').trim(),encryptionKey=process.env.SESSION_ENCRYPTION_KEY;
@@ -19,8 +20,11 @@ const store=new SupabaseStore({url:process.env.SUPABASE_URL,key:process.env.SUPA
 const telegram=new TelegramService({apiId,apiHash,dataDir,encryptionKey:encryptionHex,store}),library=new VoiceLibrary(dataDir,store),sequences=new Sequences(dataDir,store),categories=new CategoryStore(dataDir,store,library);
 try{
  await library.init();await sequences.init();await categories.init();await telegram.init();
- const app=createApp({telegram,library,sequences,categories,token,extensionPassword,extensionIds:(process.env.EXTENSION_IDS||'').split(',').map(s=>s.trim()).filter(Boolean),dashboardOrigins:(process.env.DASHBOARD_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean)});
+ let flows=null,flowWorker=null;
+ try{flows=new FlowStore(store);await flows.init();flowWorker=new FlowWorker({flows,telegram,library});flowWorker.start();}
+ catch{flows=null;console.error("Fluxos desabilitados: aplique as migrações FLUXOS-PARTE-1.sql e FLUXOS-PARTE-2.sql, nesta ordem, e reinicie. Atendimento existente preservado.");}
+ const app=createApp({flows,telegram,library,sequences,categories,token,extensionPassword,extensionIds:(process.env.EXTENSION_IDS||'').split(',').map(s=>s.trim()).filter(Boolean),dashboardOrigins:(process.env.DASHBOARD_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean)});
  const server=app.listen(port,'0.0.0.0',()=>console.log(`Telegram Atendimento 4.0 online na porta ${port}`));
  server.on('error',e=>{console.error(e.message);process.exit(1);});
- process.on('SIGTERM',()=>server.close(()=>process.exit(0)));
+ process.on('SIGTERM',()=>{flowWorker?.stop();server.close(()=>process.exit(0));});
 }catch(e){console.error(telegram.friendlyError(e));process.exit(1);}
