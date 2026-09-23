@@ -22,6 +22,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: server/package-lock.json
+      - name: Instalar ferramentas de mídia
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Instalar dependencias
         working-directory: server
         run: npm ci
