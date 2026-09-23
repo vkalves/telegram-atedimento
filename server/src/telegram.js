@@ -97,7 +97,10 @@ export class TelegramService {
         const dialogId=event.chatId?.toString?.() || String(await this.client.getPeerId(message.peerId));
         if(!/^[1-9]\d{0,19}$/.test(dialogId))return;
         const accountId=await this.getAccountId();
-        let entity=message.out?await event.getChat().catch(()=>null):await message.getSender().catch(()=>null);
+        const entityLoader=message.out
+          ? (typeof event.getChat==='function'?()=>event.getChat():null)
+          : (typeof message.getSender==='function'?()=>message.getSender():null);
+        let entity=entityLoader?await Promise.resolve().then(entityLoader).catch(()=>null):null;
         if(!entity)entity=await this.resolveTarget({dialogId}).catch(()=>null);
         const firstName=entity?.firstName||'',lastName=entity?.lastName||'';
         const payload={

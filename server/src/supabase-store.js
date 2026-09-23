@@ -24,7 +24,7 @@ export class SupabaseStore {
  }
  async getState(id){const rows=await this.request('/rest/v1/ta_state?select=payload&id=eq.'+encodeURIComponent(id));return rows.length?rows[0].payload:null;}
  async setState(id,payload){await this.request('/rest/v1/ta_state',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id,payload}),raw:true});}
- objectPath(name){if(!/^[a-f0-9-]+\.(ogg|mp4|jpg|jpeg|png)$/.test(name))throw new Error('Nome de arquivo inválido.');return '/storage/v1/object/'+encodeURIComponent(this.bucket)+'/'+encodeURIComponent(name);}
+ objectPath(name){if(!/^[a-f0-9-]+\.(ogg|mp4|jpg|jpeg|png|pdf|doc|docx|xls|xlsx|txt|csv|zip)$/.test(name))throw new Error('Nome de arquivo inválido.');return '/storage/v1/object/'+encodeURIComponent(this.bucket)+'/'+encodeURIComponent(name);}
  async upload(name,file,mime){if((await fs.stat(file)).size>50*1024*1024)throw new Error('O arquivo convertido excedeu 50 MB. Use um arquivo menor.');await this.request(this.objectPath(name),{method:'POST',headers:{'Content-Type':mime,'x-upsert':'false'},body:await openAsBlob(file,{type:mime}),raw:true});}
  async download(name,file){const response=await this.request(this.objectPath(name).replace('/object/','/object/authenticated/'),{raw:true});await pipeline(Readable.fromWeb(response.body),createWriteStream(file,{flags:'w',mode:0o600}));}
  async remove(name){await this.request('/storage/v1/object/'+encodeURIComponent(this.bucket),{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefixes:[name]}),raw:true});}

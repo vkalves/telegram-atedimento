@@ -9,7 +9,7 @@
     "test": "node --test src/*.test.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19.0"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -24,6 +24,6 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "jsdom": "^30.1.0"
+    "jsdom": "29.0.1"
   }
 }

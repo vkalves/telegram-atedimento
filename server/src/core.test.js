@@ -165,3 +165,26 @@ test('failed cloud reads and uploads do not reset existing metadata or publish m
   await assert.rejects(lib.add({path:input,originalname:'photo.png'},{kind:'image'}),/upload failed/);assert.equal(writes,0);assert.deepEqual(await lib.list(),[]);
  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
+
+test('metadata failures remove newly uploaded cloud objects and preserve the previous file',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'voice-cloud-rollback-')),state=new Map(),objects=new Map(),removed=[];let failWrite=false;
+ const store={
+  getState:async id=>structuredClone(state.get(id)??null),
+  setState:async(id,value)=>{if(failWrite)throw new Error('metadata unavailable');state.set(id,structuredClone(value));},
+  upload:async(name,file)=>objects.set(name,await fs.readFile(file)),
+  remove:async name=>{removed.push(name);objects.delete(name);}
+ };
+ try{
+  const library=new VoiceLibrary(dir,store);await library.init();
+  const originalPath=path.join(dir,'original.pdf');await fs.writeFile(originalPath,'%PDF original');
+  const original=await library.add({path:originalPath,originalname:'original.pdf'},{kind:'file',name:'Catálogo'});
+  assert.equal(objects.size,1);
+  failWrite=true;
+  const replacementPath=path.join(dir,'replacement.pdf');await fs.writeFile(replacementPath,'%PDF replacement');
+  await assert.rejects(library.replaceFile(original.id,{path:replacementPath,originalname:'replacement.pdf'}),/metadata unavailable/);
+  assert.equal(objects.size,1);assert.ok(objects.has(original.storedName));assert.equal((await library.get(original.id)).storedName,original.storedName);
+  const newPath=path.join(dir,'new.pdf');await fs.writeFile(newPath,'%PDF new');
+  await assert.rejects(library.add({path:newPath,originalname:'new.pdf'},{kind:'file'}),/metadata unavailable/);
+  assert.equal(objects.size,1);assert.equal(removed.length,2);
+ }finally{await fs.rm(dir,{recursive:true,force:true});}
+});

@@ -94,9 +94,9 @@ export function createApp({telegram,library,sequences,categories=null,flows=null
  app.get('/jobs',(_q,r)=>r.json({jobs:[...jobs.jobs.keys()].map(id=>jobs.get(id))}));
  app.post('/jobs/:id/cancel',(q,r)=>r.json({job:jobs.cancel(q.params.id)}));
  app.use((err,_q,r,_n)=>{
-  const messages={LIMIT_FILE_SIZE:'O arquivo excede 50 MB.',LIMIT_FIELD_SIZE:'Os dados do formulário excedem o limite permitido.',LIMIT_FIELD_COUNT:'O formulário contém campos demais.',LIMIT_PART_COUNT:'O formulário contém partes demais.',LIMIT_UNEXPECTED_FILE:'Campo de arquivo inesperado.'};
+  const messages={LIMIT_FILE_SIZE:'O arquivo excede 50 MB.',LIMIT_FIELD_SIZE:'Os dados do formulário excedem o limite permitido.',LIMIT_FIELD_COUNT:'O formulário contém campos demais.',LIMIT_PART_COUNT:'O formulário contém partes demais.',LIMIT_UNEXPECTED_FILE:'Campo de arquivo inesperado.','entity.too.large':'A requisição excede 1 MB.','entity.parse.failed':'O JSON enviado é inválido.'};
   const message=messages[err.code]||telegram.friendlyError(err);
-  r.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:message});
+  r.status(err.code==='LIMIT_FILE_SIZE'||err.type==='entity.too.large'?413:400).json({error:messages[err.type]||message});
  });
  return app;
 }

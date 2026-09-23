@@ -19,6 +19,16 @@ test('missing audio fails before sending; external failures are uncertain and ne
  const f=fixture();f.library.get=async()=>null;await new FlowWorker(f).execute(run);assert.equal(f.sent.length,0);assert.equal(f.results[0][1],'error');
  f.results.length=0;f.library.get=async()=>voice;f.telegram.sendItem=async()=>{f.sent.push('attempt');throw Error('timeout');};await new FlowWorker(f).execute(run);assert.equal(f.sent.length,1);assert.equal(f.results[0][1],'uncertain');
 });
+test('a template that becomes blank fails before dispatch and cannot create an uncertain send',async()=>{
+ const events=[];let dispatched=0,sent=0;
+ const worker=new FlowWorker({
+  flows:{version:3,dispatch:async()=>{dispatched++;return true;},finish:async(_run,status,_message,error)=>events.push({status,error})},
+  telegram:{requireAuthorized:async()=>{},resolveTarget:async()=>{},sendItem:async()=>{sent++;return {messageId:'1'};},friendlyError:error=>error.message},
+  library:{}
+ });
+ await worker.execute({id:'run',dialog_id:'123',target:{id:'123',name:'Lead'},claim_token:'token',current_step:0,status:'sending',snapshot:{steps:[{type:'text',text:' {telefone} ',activity:{enabled:false}}]}});
+ assert.equal(dispatched,0);assert.equal(sent,0);assert.equal(events[0].status,'error');assert.match(events[0].error,/ficou vazia/);
+});
 test('DB failure after Telegram success never repeats the send',async()=>{
  const f=fixture();let attempts=0;f.flows.finish=async()=>{attempts++;throw Error('DB down');};await new FlowWorker(f).execute(run);assert.equal(f.sent.length,1);assert.equal(attempts,2);
 });
@@ -37,6 +47,16 @@ test('flow API requires authentication, binds recipient and persists start argum
   const post=body=>fetch(base+'/flow-runs',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
   assert.equal((await post({dialogId:'999',peerKey:'123'})).status,400);assert.equal(starts,0);
   assert.equal((await post({dialogId:'123',peerKey:'123',requestId:'id'})).status,200);assert.equal(starts,1);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});
+test('flow API rejects malformed and oversized JSON before any state mutation',async()=>{
+ let saves=0;const token='b'.repeat(32),telegram={friendlyError:error=>error.message,status:async()=>({authorized:false})};
+ const app=createApp({telegram,library:{uploadDir:'/tmp'},sequences:{},token,flows:{save:async()=>{saves++;},list:async()=>[]}}),server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+ const base=`http://127.0.0.1:${server.address().port}`,headers={Authorization:'Bearer '+token,'Content-Type':'application/json'};
+ try{
+  let response=await fetch(base+'/flows',{method:'POST',headers,body:'{"name":'});assert.equal(response.status,400);assert.match((await response.json()).error,/JSON.*inválido/i);
+  response=await fetch(base+'/flows',{method:'POST',headers,body:JSON.stringify({padding:'x'.repeat(1024*1024+10)})});assert.equal(response.status,413);assert.match((await response.json()).error,/excede 1 MB/i);
+  assert.equal(saves,0);
  }finally{await new Promise(resolve=>server.close(resolve));}
 });
 test('flow REST adapter sends only server-authenticated calls and guards update revisions',async()=>{

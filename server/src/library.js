@@ -111,7 +111,7 @@ export class VoiceLibrary {
       createdAt:now,
       updatedAt:now
     };
-    let output;
+    let output,uploaded=false;
     try {
       if (kind === 'text') {
         item.text = String(input.text || '').trim();
@@ -129,11 +129,15 @@ export class VoiceLibrary {
         item.size = (await fs.stat(output)).size;
         if(this.store) {
           const mime=kind==='voice'?'audio/ogg':mimeByExtension[ext];
-          await this.store.upload(item.storedName,output,mime);
+          await this.store.upload(item.storedName,output,mime);uploaded=true;
         }
       }
       const items = await this.read();items.push(item);await this.write(items);return item;
-    } catch(e) { if(output) await fs.rm(output,{force:true}).catch(()=>{}); throw e; }
+    } catch(e) {
+      if(uploaded) await this.store.remove(item.storedName).catch(()=>{});
+      if(output) await fs.rm(output,{force:true}).catch(()=>{});
+      throw e;
+    }
     finally { if(file) await fs.rm(file.path,{force:true}).catch(()=>{}); }
   }); }
   update(id, input) { return this.lock(async()=>{
@@ -161,12 +165,13 @@ export class VoiceLibrary {
     const oldName=item.storedName;
     const newName=crypto.randomUUID()+(item.kind==='voice'?'.ogg':item.kind==='video'?'.mp4':ext);
     const output=path.join(this.libraryDir,newName);
+    let uploaded=false;
     try {
       let converted={};
       if(item.kind==='voice')converted=await convertToTelegramVoice(file.path,output);
       else if(item.kind==='video')converted=await convertToTelegramVideo(file.path,output);
       else await fs.copyFile(file.path,output);
-      if(this.store) await this.store.upload(newName,output,item.kind==='voice'?'audio/ogg':mimeByExtension[path.extname(newName)]);
+      if(this.store) {await this.store.upload(newName,output,item.kind==='voice'?'audio/ogg':mimeByExtension[path.extname(newName)]);uploaded=true;}
       const replacement={...item,storedName:newName,originalName:path.basename(file.originalname).slice(0,180),...converted,size:(await fs.stat(output)).size,updatedAt:new Date().toISOString()};
       items[items.findIndex(x=>x.id===id)]=replacement;
       await this.write(items);
@@ -176,6 +181,7 @@ export class VoiceLibrary {
       }
       return replacement;
     } catch(e) {
+      if(uploaded) await this.store.remove(newName).catch(()=>{});
       await fs.rm(output,{force:true}).catch(()=>{});
       throw e;
     } finally {

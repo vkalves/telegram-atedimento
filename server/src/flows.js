@@ -169,6 +169,7 @@ export class FlowWorker{
     if(item.kind==='text')item={...item,text:renderTemplate(item.text,run.target||{id:run.dialog_id,name:run.target_name},run.last_reply)};
     configuredActivity=step.activity;
    }else throw new Error('Tipo de etapa não suportado.');
+   if(item.kind==='text'&&!String(item.text||'').trim())throw new Error('A mensagem ficou vazia após substituir as variáveis do lead.');
    await this.telegram.requireAuthorized();
    await this.telegram.resolveTarget({dialogId:run.dialog_id});
    await this.showActivity(run,item,configuredActivity);

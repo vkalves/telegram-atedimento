@@ -39,3 +39,13 @@ test('eventos privados identificam conta, conversa, direção e perfil sem depen
  assert.equal(received[0].accountId,'99');assert.equal(received[0].dialogId,'123');assert.equal(received[0].direction,'incoming');assert.equal(received[0].target.firstName,'Ana');assert.equal(received[0].text,'Oi');
  assert.equal(received.length,2);assert.equal(getMeCalls,1,'a conta é consultada uma única vez, não a cada update');
 });
+
+test('updates sem helpers de entidade usam resolução segura e continuam chegando aos observadores',async()=>{
+ const service=new TelegramService({apiId:1,apiHash:'test',dataDir:'/unused'});let callback;const received=[];
+ service.client={addEventHandler:handler=>callback=handler,getMe:async()=>({id:99n}),getPeerId:async()=>123n};
+ service.resolveTarget=async()=>({className:'User',firstName:'Fallback',username:'fallback'});
+ service.onMessage(message=>received.push(message));service.installMessageHandler();
+ await callback({isPrivate:true,chatId:123n,message:{id:9,date:new Date(1000_000),out:false,message:'Entrada'}});
+ await callback({isPrivate:true,chatId:123n,message:{id:10,date:1001,out:true,message:'Saída'}});
+ assert.deepEqual(received.map(message=>[message.direction,message.target.firstName]),[['incoming','Fallback'],['outgoing','Fallback']]);
+});

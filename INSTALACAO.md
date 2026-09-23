@@ -120,7 +120,7 @@ gatilhos, garantias de concorrência e limitações oficiais do Telegram.
 
 ## 7. Testar localmente
 
-Com Node.js 20 ou superior, na pasta `server`:
+Com Node.js 20.19 ou superior, na pasta `server`:
 
 ```bash
 npm ci
