@@ -10,12 +10,28 @@ const FLOW_ERRORS=[
 ];
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export function requireUUID(value) {if(!uuid(value))throw new Error('Identificador inválido.');return value;}
+function optionalTypingSeconds(value) {
+ if(value===undefined||value===null||value==='')return undefined;
+ const seconds=Number(value);
+ if(!Number.isInteger(seconds)||seconds<1||seconds>20)throw new Error('O tempo de “digitando…” deve ser um número inteiro de 1 a 20 segundos.');
+ return seconds;
+}
+export function activityOptionsForStep(step,{followup=false}={}) {
+ const seconds=followup?step?.followupTypingSeconds:step?.typingSeconds;
+ if(Number.isInteger(seconds)&&seconds>0)return {activityDelay:seconds*1000};
+ return {activity:'auto'};
+}
 export function validateFlow(input, library) {
  if(!input || typeof input.name!=='string' || !input.name.trim() || input.name.trim().length>80)throw new Error('Informe um nome de até 80 caracteres.');
  if(typeof input.active!=='boolean')throw new Error('Status do fluxo inválido.');
  if(!Array.isArray(input.steps)||input.steps.length<1||input.steps.length>30)throw new Error('Use entre 1 e 30 etapas.');
  const steps=input.steps.map(step=>{
-  if(step?.type==='text' && typeof step.text==='string' && step.text.trim() && step.text.length<=4096)return {type:'text',text:step.text};
+  if(step?.type==='text' && typeof step.text==='string' && step.text.trim() && step.text.length<=4096){
+   const result={type:'text',text:step.text};
+   const typingSeconds=optionalTypingSeconds(step.typingSeconds);
+   if(typingSeconds)result.typingSeconds=typingSeconds;
+   return result;
+  }
   if(step?.type==='wait' && Number.isInteger(step.seconds) && step.seconds>=1 && step.seconds<=86400)return {type:'wait',seconds:step.seconds};
   if(step?.type==='reply'){
    const timeoutSeconds=step.timeoutSeconds??0,timeoutAction=step.timeoutAction??'end';
@@ -24,6 +40,8 @@ export function validateFlow(input, library) {
    if(timeoutSeconds>0&&timeoutAction==='followup'){
     if(typeof step.followupText!=='string'||!step.followupText.trim()||step.followupText.length>4096)throw new Error('Preencha o texto do follow-up (até 4096 caracteres).');
     result.followupText=step.followupText;
+    const followupTypingSeconds=optionalTypingSeconds(step.followupTypingSeconds);
+    if(followupTypingSeconds)result.followupTypingSeconds=followupTypingSeconds;
    }
    return result;
   }
@@ -60,10 +78,10 @@ export class FlowStore {
  async request(route,method='GET',body){return this.store.request('/rest/v1/'+route,{method,safeErrors:FLOW_ERRORS,headers:{'Content-Type':'application/json',Prefer:'return=representation'},...(body===undefined?{}:{body:JSON.stringify(body)})});}
  async rpc(name,body={}){
   const result=await this.request('rpc/ta_flow_'+name,'POST',body);
-  // PostgREST can encode a composite return as a one-row array. Queue RPCs remain arrays.
   return ['start','finish','cancel','arm','reply','control'].includes(name)&&Array.isArray(result)?result[0]??null:result;
  }
- list(){return this.request('ta_flows?deleted_at=is.null&order=created_at.desc');}
+ list(){return this.request('ta_flows?deleted_at=is.null&order=created_at.desc');
+ }
  async save(input,library,id=null){
   const payload=validateFlow(input,await library.list());
   if(payload.steps.some(step=>step.type==='reply'))this.requireV2();
@@ -117,13 +135,11 @@ export class FlowWorker {
     if(!item || (item.kind||'voice')!=='voice' || item.active===false || !item.path)throw new Error('Áudio excluído, desativado ou indisponível.');
    }else throw new Error('Tipo de etapa não suportado.');
    await this.telegram.requireAuthorized();
-   // Resolve before marking the external send boundary; never use the browser's current conversation.
    await this.telegram.resolveTarget({dialogId:run.dialog_id});
-   // Presence is not a send. Pause/cancel during typing still blocks dispatch (send_started=false).
    if(typeof this.telegram.simulateActivity==='function'){
     try{
      await this.telegram.simulateActivity(item,{dialogId:run.dialog_id},{
-      activity:'auto',
+      ...activityOptionsForStep(step,{followup:run.dispatch_kind==='followup'}),
       shouldContinue:this.flows.version>=2&&typeof this.flows.canDispatch==='function'?()=>this.flows.canDispatch(run):undefined
      });
     }catch(error){
@@ -133,8 +149,7 @@ export class FlowWorker {
    }
    if(this.flows.version>=2&&!await this.flows.dispatch(run))return;
    sending=true;
-   const result=await this.telegram.sendItem(item,{dialogId:run.dialog_id});
-   // A database failure here must NEVER call sendItem a second time.
+   const result=await this.telegram.sendItem(item,{dialogId:run.dialog_id},{skipActivity:true});
    await this.flows.finish(run,'completed',result.messageId);
   }catch(error){
    if(!sending && (error instanceof ActivityAbortedError || error?.name==='ActivityAbortedError'))return;
