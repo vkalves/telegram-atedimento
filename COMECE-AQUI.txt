@@ -16,7 +16,9 @@ No SQL Editor do mesmo projeto, execute nesta ordem:
 3. supabase/FLUXOS-PARTE-2.sql (se ainda não aplicada)
 4. supabase/FLUXOS-PARTE-3.sql
 
-Os scripts são aditivos e podem ser executados novamente. Não crie políticas
+CONFIGURAR.sql e a Parte 3 podem ser executados novamente. Se reaplicar toda a
+cadeia, mantenha obrigatoriamente a ordem Parte 1 -> Parte 2 -> Parte 3. Nunca
+execute uma parte antiga isoladamente depois de uma nova. Não crie políticas
 públicas para ta_state, tabelas ta_flow_* ou o bucket ta-media.
 
 PUBLICAÇÃO

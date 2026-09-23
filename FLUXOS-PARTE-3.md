@@ -16,8 +16,12 @@ Com o backend parado durante a migração:
 4. Publique o backend, dashboard e extensão deste branch.
 5. Confirme no endpoint autenticado `/flow-capabilities` que a versão é `3`.
 
-Os scripts podem ser executados novamente. As execuções em andamento mantêm o
-snapshot do fluxo com que começaram; uma edição só afeta novas execuções.
+`CONFIGURAR.sql` e `FLUXOS-PARTE-3.sql` podem ser executados novamente. Se for
+necessário reaplicar toda a cadeia, preserve obrigatoriamente a ordem Parte 1 →
+Parte 2 → Parte 3; nunca execute uma parte antiga isoladamente depois da Parte
+3, pois ela contém versões anteriores das funções. As execuções em andamento
+mantêm o snapshot do fluxo com que começaram; uma edição só afeta novas
+execuções.
 
 ## Etapas disponíveis
 

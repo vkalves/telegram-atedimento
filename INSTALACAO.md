@@ -21,8 +21,10 @@ O navegador não precisa permanecer aberto para um fluxo continuar.
    servidor (`sb_secret_...` ou `service_role` legada).
 
 Em uma instalação já existente, execute novamente `CONFIGURAR.sql` para liberar
-os novos tipos de arquivo e depois apenas as Partes ainda não aplicadas. As
-migrações são aditivas e repetíveis.
+os novos tipos de arquivo e depois apenas as Partes ainda não aplicadas. Se as
+Partes 1 e 2 já estiverem instaladas, execute somente a Parte 3. Para reaplicar
+a cadeia completa, preserve sempre a ordem Parte 1 → Parte 2 → Parte 3; não
+execute uma migração antiga isoladamente depois de uma nova.
 
 Nunca use a chave `anon`/`publishable` no backend e nunca coloque a chave
 secreta em `dashboard/`, `extension/` ou no GitHub.
