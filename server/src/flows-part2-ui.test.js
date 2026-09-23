@@ -15,11 +15,13 @@ test('editor salva espera de duas horas com follow-up e comandos apontam para a 
  const api=async(path,options={})=>{calls.push([path,options]);return path==='/flows'?{flows:[]}:path==='/flow-runs'?{runs:[run]}:{run};};
  try{
   const ui=setupFlows({api,element,button,showToast:()=>{},getItems:()=>[]});await ui.refresh();$('newFlow').click();$('flowName').value='Respostas';$('addFlowreply').click();
-  const input=$('flowSteps').querySelector('input');input.value='7200';input.dispatchEvent(new dom.window.Event('input'));
-  const select=$('flowSteps').querySelector('select');select.value='followup';select.dispatchEvent(new dom.window.Event('change'));
+  const input=$('flowSteps').querySelector('input[type="number"]');input.value='2';input.dispatchEvent(new dom.window.Event('input'));
+  const unit=[...$('flowSteps').querySelectorAll('select')].find(node=>[...node.options].some(option=>option.value==='hours'));unit.value='hours';unit.dispatchEvent(new dom.window.Event('change'));
+  const select=[...$('flowSteps').querySelectorAll('select')].find(node=>[...node.options].some(option=>option.value==='followup'));select.value='followup';select.dispatchEvent(new dom.window.Event('change'));
   const text=$('flowSteps').querySelector('textarea');text.value='Posso ajudar?';text.dispatchEvent(new dom.window.Event('input'));
   await $('flowForm').onsubmit({preventDefault(){}});
-  const save=calls.find(([p,o])=>p==='/flows'&&o.method==='POST');assert.deepEqual(save[1].body.steps,[{type:'reply',timeoutSeconds:7200,timeoutAction:'followup',followupText:'Posso ajudar?'}]);
+  const save=calls.find(([p,o])=>p==='/flows'&&o.method==='POST');assert.equal(save[1].body.steps[0].type,'reply');assert.equal(save[1].body.steps[0].timeoutSeconds,7200);assert.equal(save[1].body.steps[0].timeoutAction,'followup');assert.equal(save[1].body.steps[0].followupText,'Posso ajudar?');assert.ok(save[1].body.steps[0].id);
+  assert.equal(save[1].body.steps[0].followupActivity.type,'typing');assert.equal(save[1].body.steps[0].followupActivity.durationSeconds,3);
   assert.match($('flowRuns').textContent,/Aguardando resposta/);
   const take=[...$('flowRuns').querySelectorAll('button')].find(b=>b.textContent==='Assumir atendimento');take.click();take.click();await new Promise(r=>setImmediate(r));
   const commands=calls.filter(([p])=>p==='/flow-runs/run-A/control');assert.equal(commands.length,1);assert.equal(commands[0][1].body.action,'human');assert.equal(commands[0][1].body.version,7);assert.ok(commands[0][1].body.requestId);

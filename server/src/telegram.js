@@ -3,6 +3,14 @@ import path from "node:path";
 import {encodeSession,decodeSession} from "./session-store.js";
 import { TelegramClient, Api } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
+import { NewMessage } from "teleproto/events/index.js";
+
+function telegramDateIso(value) {
+  const numeric = value instanceof Date ? value.getTime() : Number(value);
+  const milliseconds = Number.isFinite(numeric) && numeric > 0 ? (numeric > 1e12 ? numeric : numeric * 1000) : Date.now();
+  const date = new Date(milliseconds);
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
 
 class Deferred {
   constructor() {
@@ -31,6 +39,10 @@ export class TelegramService {
     this.dialogMap = new Map();
     this.dialogMapUpdatedAt = 0;
     this.dialogRefreshPromise = null;
+    this.messageHandlers = new Set();
+    this.messageEventInstalled = false;
+    this.accountId = null;
+    this.accountIdPromise = null;
   }
 
   async init() {
@@ -53,9 +65,51 @@ export class TelegramService {
     );
 
     await this.client.connect();
+    this.installMessageHandler();
     if (await this.client.checkAuthorization()) {
       this.state = "authorized";
     }
+  }
+
+  onMessage(handler) {
+    if (typeof handler !== 'function') throw new Error('O observador de mensagens precisa ser uma função.');
+    this.messageHandlers.add(handler);
+    return () => this.messageHandlers.delete(handler);
+  }
+
+  async getAccountId() {
+    if (this.accountId) return this.accountId;
+    if (!this.accountIdPromise) {
+      this.accountIdPromise = this.client.getMe()
+        .then(me => (this.accountId = String(me.id)))
+        .finally(() => { this.accountIdPromise = null; });
+    }
+    return this.accountIdPromise;
+  }
+
+  installMessageHandler() {
+    if (!this.client || this.messageEventInstalled || typeof this.client.addEventHandler !== 'function') return;
+    this.messageEventInstalled = true;
+    this.client.addEventHandler(async event => {
+      if (!event?.isPrivate || !event.message || !this.messageHandlers.size) return;
+      try {
+        const message=event.message;
+        const dialogId=event.chatId?.toString?.() || String(await this.client.getPeerId(message.peerId));
+        if(!/^[1-9]\d{0,19}$/.test(dialogId))return;
+        const accountId=await this.getAccountId();
+        let entity=message.out?await event.getChat().catch(()=>null):await message.getSender().catch(()=>null);
+        if(!entity)entity=await this.resolveTarget({dialogId}).catch(()=>null);
+        const firstName=entity?.firstName||'',lastName=entity?.lastName||'';
+        const payload={
+          direction:message.out?'outgoing':'incoming',accountId,dialogId,messageId:String(message.id),
+          text:String(message.message||message.text||'').slice(0,4096),
+          type:message.media?.className||(message.message?'text':'message'),date:telegramDateIso(message.date),
+          target:{id:dialogId,name:[firstName,lastName].filter(Boolean).join(' ')||entity?.username||'Conversa',firstName:firstName||null,lastName:lastName||null,username:entity?.username||null,phone:entity?.phone||null}
+        };
+        const results=await Promise.allSettled([...this.messageHandlers].map(handler=>handler(payload)));
+        for(const result of results)if(result.status==='rejected')console.error(`[telegram-update] ${this.friendlyError(result.reason)}`);
+      } catch(error) { console.error(`[telegram-update] ${this.friendlyError(error)}`); }
+    },new NewMessage({}));
   }
 
   async status() {
@@ -81,6 +135,7 @@ export class TelegramService {
     }
     this.state = "authorized";
     const me = await this.client.getMe();
+    this.accountId = String(me.id);
     const first = me?.firstName || "";
     const last = me?.lastName || "";
     return {
@@ -142,6 +197,8 @@ export class TelegramService {
           await fs.chmod(this.sessionPath, 0o600).catch(() => {});
         }
         this.sessionPersisted = true;
+        this.accountId = null;
+        this.accountIdPromise = null;
         this.authRetryAt = 0;
         this.pending = null;
         this.state = "authorized";
@@ -313,7 +370,7 @@ export class TelegramService {
     if (!entity || className !== 'User') throw new Error("Esta versão atende conversas privadas. Abra uma conversa com uma pessoa.");
     const id = String(await this.client.getPeerId(entity));
     this.dialogMap.set(id,entity);
-    return {id,name: [entity.firstName,entity.lastName].filter(Boolean).join(' ') || entity.username || 'Conversa',username:entity.username || null};
+    return {id,name: [entity.firstName,entity.lastName].filter(Boolean).join(' ') || entity.username || 'Conversa',firstName:entity.firstName||null,lastName:entity.lastName||null,username:entity.username || null,phone:entity.phone||null};
   }
 
   async resolveTarget({ dialogId, username }) {
@@ -349,16 +406,16 @@ export class TelegramService {
   async flowReplyBaseline(dialogId) {
     const entity=await this.resolveTarget({dialogId});
     if(entity?.className!=='User')throw new Error('A espera aceita somente conversas privadas.');
-    const me=await this.client.getMe();
+    const accountId=await this.getAccountId();
     const messages=await this.client.getMessages(entity,{limit:1});
-    return {accountId:String(me.id),cursor:Number(messages[0]?.id||0)};
+    return {accountId,cursor:Number(messages[0]?.id||0)};
   }
 
   async flowReplyPage(run) {
     const entity=await this.resolveTarget({dialogId:run.dialog_id});
     if(entity?.className!=='User')throw new Error('Conversa privada não localizada.');
-    const me=await this.client.getMe();
-    if(String(me.id)!==run.reply_account_id)throw new Error('A conta Telegram mudou. Reconecte a conta original para continuar.');
+    const accountId=await this.getAccountId();
+    if(accountId!==run.reply_account_id)throw new Error('A conta Telegram mudou. Reconecte a conta original para continuar.');
     const checkedAt=new Date().toISOString();
     // Ascending pagination prevents losing a reply behind a large offline backlog.
     const rows=await this.client.getMessages(entity,{limit:100,minId:Number(run.reply_cursor||0),reverse:true});
@@ -369,9 +426,9 @@ export class TelegramService {
       if(dialog!==run.dialog_id)throw new Error('O Telegram retornou histórico de outra conversa. Consulta interrompida.');
       cursor=Math.max(cursor,message.id);
       if(message.className!=='Message'||message.out||dialog!==run.dialog_id||sender!==run.dialog_id||!Number.isFinite(message.date))continue;
-      messages.push({id:message.id,date:message.date,dialogId:dialog,senderId:sender});
+      messages.push({id:message.id,date:message.date,dialogId:dialog,senderId:sender,text:String(message.message||message.text||'').slice(0,4096),type:message.media?.className||(message.message?'text':'message')});
     }
-    return {accountId:String(me.id),messages,cursor,complete:rows.length<100,checkedAt};
+    return {accountId,messages,cursor,complete:rows.length<100,checkedAt};
   }
 
   async sendItem(item, target, {recordingDelay = 0} = {}) {
@@ -400,9 +457,35 @@ export class TelegramService {
         options.supportsStreaming = true;
         options.attributes = [new Api.DocumentAttributeVideo({duration: item.duration || 1, w:item.width || 2, h:item.height || 2, supportsStreaming:true})];
       }
+      if (item.kind === 'file') {
+        const fallbackExtension=path.extname(item.path||'');
+        const fileName=path.basename(item.originalName||`${item.name||'arquivo'}${fallbackExtension}`).slice(0,180);
+        options.forceDocument=true;
+        options.attributes=[new Api.DocumentAttributeFilename({fileName})];
+      }
       result = await this.client.sendFile(entity, options);
     }
     if (!result?.id) throw new Error("O Telegram não confirmou o envio. Confira a conversa antes de tentar novamente.");
     return { messageId: String(result.id) };
+  }
+
+  async sendActivity(target, action='typing') {
+    const entity=await this.resolveTarget(target);
+    const factories={
+      typing:()=>new Api.SendMessageTypingAction(),
+      'record-audio':()=>new Api.SendMessageRecordAudioAction(),
+      'upload-audio':()=>new Api.SendMessageUploadAudioAction({progress:1}),
+      photo:()=>new Api.SendMessageUploadPhotoAction({progress:1}),
+      video:()=>new Api.SendMessageUploadVideoAction({progress:1}),
+      document:()=>new Api.SendMessageUploadDocumentAction({progress:1})
+    };
+    const factory=factories[action];
+    if(!factory)throw new Error('Indicador de atividade não suportado.');
+    await this.client.invoke(new Api.messages.SetTyping({peer:entity,action:factory()}));
+  }
+
+  async cancelActivity(target) {
+    const entity=await this.resolveTarget(target);
+    await this.client.invoke(new Api.messages.SetTyping({peer:entity,action:new Api.SendMessageCancelAction()}));
   }
 }

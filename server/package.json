@@ -1,9 +1,9 @@
 {
   "name": "telegram-voice-local-server",
-  "version": "4.0.0",
+  "version": "6.0.0",
   "private": true,
   "type": "module",
-  "description": "Telegram Atendimento 4.0: API privada, dashboard e extensão de áudios",
+  "description": "Telegram Atendimento 6.0: conteúdos e fluxos automatizados persistentes",
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test src/*.test.js"

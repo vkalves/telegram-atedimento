@@ -1,44 +1,45 @@
-TELEGRAM ATENDIMENTO 4.0 — RENDER + SUPABASE
+TELEGRAM ATENDIMENTO 6.0 — CONTEÚDOS + FLUXOS AUTOMATIZADOS
 
-Esta versão separa a administração da biblioteca do uso diário no Telegram:
+O QUE EXISTE
 
-- dashboard/: painel web para cadastrar, organizar e ouvir áudios;
-- extension/: extensão Chrome com somente uma barra compacta abaixo do campo de mensagem;
-- server/: API do Render, conversão OGG/Opus, sessão Telegram e envio como voz;
-- supabase/CONFIGURAR.sql: tabela de estado e bucket privado ta-media.
+- dashboard/: biblioteca, construtor visual, execuções e logs;
+- extension/: áudios rápidos e controles do fluxo na conversa atual;
+- server/: API, Telegram e motor persistente por lead;
+- supabase/: estado, mídia privada e três migrações do motor.
 
-O dashboard usa o ACCESS_TOKEN e a extensão usa EXTENSION_PASSWORD. A chave secreta do
-Supabase fica exclusivamente no Render. Não publique credenciais no GitHub.
+ATUALIZAÇÃO OBRIGATÓRIA DO SUPABASE
 
-COMECE PELO SUPABASE
+No SQL Editor do mesmo projeto, execute nesta ordem:
 
-1. Crie um projeto dedicado no plano Free.
-2. Abra SQL Editor e execute todo o arquivo supabase/CONFIGURAR.sql.
-3. Confirme que existe o bucket privado ta-media.
-4. Copie Project URL e uma chave secreta de servidor para as variáveis do Render.
+1. supabase/CONFIGURAR.sql
+2. supabase/FLUXOS-PARTE-1.sql (se ainda não aplicada)
+3. supabase/FLUXOS-PARTE-2.sql (se ainda não aplicada)
+4. supabase/FLUXOS-PARTE-3.sql
 
-PUBLICAÇÃO DO BACKEND
+Os scripts são aditivos e podem ser executados novamente. Não crie políticas
+públicas para ta_state, tabelas ta_flow_* ou o bucket ta-media.
 
-Use o Blueprint render.yaml. Preencha SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-TELEGRAM_API_ID, TELEGRAM_API_HASH e EXTENSION_PASSWORD. Mantenha estáveis ACCESS_TOKEN e
-SESSION_ENCRYPTION_KEY. Depois do deploy, copie a URL HTTPS do serviço.
+PUBLICAÇÃO
 
-PUBLICAÇÃO DO DASHBOARD
+Sincronize o Blueprint render.yaml. Preserve ACCESS_TOKEN e
+SESSION_ENCRYPTION_KEY e preencha SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+TELEGRAM_API_ID, TELEGRAM_API_HASH, DASHBOARD_ORIGINS e EXTENSION_PASSWORD.
 
-Crie um Static Site separado usando a pasta dashboard como Root Directory,
-sem Build Command e com Publish Directory . Depois, coloque a URL completa
-do dashboard na variável DASHBOARD_ORIGINS do serviço web do Render e publique
-novamente a API. Para testar localmente, http://localhost:4173 já é aceito.
+Depois do deploy:
 
-INSTALAÇÃO DA EXTENSÃO
+1. abra o dashboard e conecte a API com ACCESS_TOKEN;
+2. conecte a conta Telegram;
+3. atualize a extensão em chrome://extensions;
+4. entre nas opções com EXTENSION_PASSWORD;
+5. crie e ative um fluxo no dashboard;
+6. inicie pela conversa ou configure um gatilho.
 
-1. Abra chrome://extensions e ative o Modo do desenvolvedor.
-2. Clique em Carregar sem compactação e escolha a pasta extension.
-3. Abra Opções da extensão e entre com EXTENSION_PASSWORD.
-4. Abra ou atualize o Telegram Web e entre em uma conversa privada.
-5. A barra aparecerá abaixo do campo de mensagem; use o deslizador e clique uma vez no nome do áudio.
+O navegador pode ser fechado. O estado permanece no Supabase e o backend
+continua a execução. Hospedagens que hibernam retomam ao acordar, mas não
+garantem tempo exato enquanto o processo estiver suspenso.
 
-No dashboard, use o cartão da conta Telegram para fazer o primeiro login
-(telefone, código e senha 2FA). A extensão não tem mais painel lateral.
+O envio manual de áudios continua funcionando. Os indicadores de digitando,
+gravando e enviando são ações nativas do Telegram, quando suportadas pelo tipo
+de conteúdo.
 
-O guia detalhado está em INSTALACAO.md e em dashboard/README.md.
+Leia INSTALACAO.md e FLUXOS-PARTE-3.md antes de publicar em produção.

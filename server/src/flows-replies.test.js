@@ -131,7 +131,7 @@ test('Parte 2: banco persistente e isolamento de respostas e comandos',async t=>
  }finally{await db.close();await fs.rm(dir,{recursive:true,force:true});}
 });
 
-test('validação de espera e follow-up limita tipos e não adiciona variáveis ou condições',()=>{
+test('validação de espera e follow-up mantém compatibilidade com fluxos da Parte 2',()=>{
  const valid=validateFlow({name:'A',active:true,steps:[{...reply,timeoutSeconds:7200,timeoutAction:'followup',followupText:'Olá {nome}'}]},[]);assert.equal(valid.steps[0].followupText,'Olá {nome}');
  for(const step of [{...reply,timeoutSeconds:-1},{...reply,timeoutSeconds:1.5},{...reply,timeoutAction:'ai'},{...reply,timeoutSeconds:1,timeoutAction:'followup',followupText:''}])assert.throws(()=>validateFlow({name:'A',active:true,steps:[step]},[]));
 });

@@ -1,6 +1,6 @@
 (() => {
   const HOST_ID = 'telegram-atendimento-5-audio-bar';
-  const VERSION = '5.2.0';
+  const VERSION = '6.0.0';
   const CONTEXT_RETRY_DELAYS = [1200, 3000, 7000];
   const LEGACY_HOST_ID = 'telegram-atendimento-4-audio-bar';
   const legacyHost = document.getElementById(LEGACY_HOST_ID);
@@ -108,7 +108,7 @@
     if(shown){
       const labels={running:'executando',waiting:'aguardando tempo',sending:'enviando',arming_reply:'preparando espera',awaiting_reply:'aguardando resposta',paused:'pausado',done:'concluído',cancelled:'cancelado',error:'erro',uncertain:'conferir envio'};
       const status=document.createElement('span');status.style.cssText='white-space:nowrap;flex:0 0 auto;font-size:11px';
-      status.textContent=`Fluxo ${run?'ativo':'recente'}: ${shown.snapshot.name} · Status: ${labels[shown.status]||shown.status} · Etapa atual: ${Math.min(shown.current_step+1,shown.snapshot.steps.length)} de ${shown.snapshot.steps.length}${shown.pause_requested?' · Pausa pendente':''}${shown.human_takeover?' · Atendimento humano':''}`;
+      status.textContent=`Fluxo ${run?'ativo':'recente'}: ${shown.snapshot.name} · Status: ${labels[shown.status]||shown.status} · Etapa atual: ${Math.min(shown.current_step+1,shown.snapshot.steps.length)} de ${shown.snapshot.steps.length}${shown.current_step_label?' ('+shown.current_step_label+')':''}${shown.next_step_label?' · Próxima: '+shown.next_step_label:''}${shown.pause_requested?' · Pausa pendente':''}${shown.human_takeover?' · Atendimento humano':''}`;
       status.title=shown.error||status.textContent;itemsElement.append(status);
       const actions=[];
       if(run&&run.status!=='uncertain')actions.push(run.status==='paused'?['resume','Continuar fluxo']:['pause','Pausar fluxo'],['human','Assumir atendimento']);

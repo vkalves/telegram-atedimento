@@ -25,11 +25,11 @@ test('dashboard creates, reorders, edits, disables and deletes flows with existi
   const ui=setupFlows({api,element,button,showToast:()=>{},getItems:()=>[{id:'audio',name:'Existente',storedName:'audio.ogg',active:true}]});await ui.refresh();
   $('newFlow').click();$('flowName').value='Atendimento';
   $('addFlowtext').click();let input=$('flowSteps').querySelector('textarea');input.value='Olá';input.dispatchEvent(new dom.window.Event('input'));
-  $('addFlowwait').click();$('addFlowaudio').click();input=$('flowSteps').querySelector('select');input.value='audio';input.dispatchEvent(new dom.window.Event('change'));
+  $('addFlowwait').click();$('addFlowaudio').click();input=$('flowSteps').lastElementChild.querySelector('select');input.value='audio';input.dispatchEvent(new dom.window.Event('change'));
   assert.equal($('flowSteps').children.length,3);
   const last=$('flowSteps').lastElementChild;[...last.querySelectorAll('button')].find(b=>b.textContent.includes('Subir')).click();
   await $('flowForm').onsubmit({preventDefault(){}});
-  assert.deepEqual(flows[0].steps.map(s=>s.type),['text','audio','wait']);assert.equal(flows[0].steps[1].audioId,'audio');assert.equal($('flowDialog').open,false);
+  assert.deepEqual(flows[0].steps.map(s=>s.type),['text','content','wait']);assert.equal(flows[0].steps[1].itemId,'audio');assert.ok(flows[0].steps.every(step=>step.id));assert.equal($('flowDialog').open,false);
   [...$('flowList').querySelectorAll('button')].find(b=>b.textContent==='Editar').click();$('flowName').value='Editado';await $('flowForm').onsubmit({preventDefault(){}});assert.equal(flows[0].name,'Editado');
   [...$('flowList').querySelectorAll('button')].find(b=>b.textContent==='Desativar').click();await settle();assert.equal(flows[0].active,false);
   [...$('flowList').querySelectorAll('button')].find(b=>b.textContent==='Excluir').click();await settle();assert.equal(flows.length,0);

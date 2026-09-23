@@ -123,7 +123,7 @@ test('username context resolves quickly and falls back to a matching dialog',asy
   getPeerId:async entity=>entity.id.toString()
  };
  const target=await service.currentTarget('@Viela2K');
- assert.deepEqual(target,{id:'88',name:'Viela 2K',username:'viela2k'});
+ assert.deepEqual(target,{id:'88',name:'Viela 2K',firstName:'Viela',lastName:'2K',username:'viela2k',phone:null});
  assert.equal(dialogCalls,1);
 });
 
@@ -135,7 +135,7 @@ test('numeric context falls back to direct lookup when refreshing dialogs fails'
   getEntity:async id=>({id,className:'User',firstName:'Ana'}),
   getPeerId:async entity=>entity.id.toString()
  };
- assert.deepEqual(await service.currentTarget('11'),{id:'11',name:'Ana',username:null});
+ assert.deepEqual(await service.currentTarget('11'),{id:'11',name:'Ana',firstName:'Ana',lastName:null,username:null,phone:null});
 });
 
 test('Supabase-backed audio, favorites and sequences survive removal of all local data',async()=>{

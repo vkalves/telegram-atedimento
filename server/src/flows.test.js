@@ -5,9 +5,9 @@ import {createApp} from './app.js';
 const voice={id:'audio-1',kind:'voice',active:true,storedName:'audio.ogg',path:'/existing/audio.ogg'};
 const run={id:'run',claim_token:'token',dialog_id:'123',current_step:0,snapshot:{steps:[{type:'audio',audioId:voice.id}]}};
 function fixture(){const sent=[],results=[];return {sent,results,flows:{finish:async(...args)=>results.push(args)},library:{get:async()=>voice},telegram:{requireAuthorized:async()=>{},resolveTarget:async()=>{},sendItem:async(...args)=>{sent.push(args);return {messageId:'42'};},friendlyError:e=>e.message},logger:{error:()=>{}}};}
-test('validates three supported types and rejects missing/inactive audio, variables stay literal',()=>{
+test('validates legacy types, assigns stable metadata and rejects missing audio',()=>{
  const input={name:'Teste',active:true,steps:[{type:'text',text:'Olá {nome}'},{type:'wait',seconds:3},{type:'audio',audioId:voice.id}]};
- assert.deepEqual(validateFlow(input,[voice]),input);
+ const valid=validateFlow(input,[voice]);assert.equal(valid.name,input.name);assert.deepEqual(valid.steps.map(step=>step.type),['text','wait','audio']);assert.ok(valid.steps.every(step=>step.id));assert.equal(valid.steps[0].activity.type,'typing');assert.equal(valid.steps[2].activity.type,'record-audio');
  for(const step of [{type:'typing'},{type:'wait',seconds:-1},{type:'wait',seconds:1.1},{type:'text',text:''},{type:'audio',audioId:'missing'}])assert.throws(()=>validateFlow({...input,steps:[step]},[voice]));
  assert.throws(()=>validateFlow(input,[{...voice,active:false}]));
 });

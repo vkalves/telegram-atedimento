@@ -1,32 +1,38 @@
-# Telegram Atendimento 4.0
+# Telegram Atendimento 6.0
 
-O projeto agora possui duas interfaces separadas:
+O projeto possui três partes integradas:
 
-- **Dashboard:** administra a biblioteca de áudios.
-- **Extensão Chrome:** mostra somente uma barra compacta abaixo do campo de mensagem do Telegram Web e envia o áudio para a conversa aberta.
+- **Dashboard:** biblioteca de conteúdos, construtor visual, execuções e logs;
+- **Extensão Chrome:** áudios rápidos e controle do fluxo na conversa aberta;
+- **Backend:** autenticação Telegram, mídia e motor persistente por lead.
 
-O Render continua sendo a API e o responsável por autenticar a conta do
-Telegram, converter os arquivos para OGG/Opus e enviar a mensagem de voz. O
-Supabase guarda os metadados e o Storage privado.
+O navegador não precisa permanecer aberto para um fluxo continuar.
 
-## 1. Configurar o Supabase
+## 1. Configurar ou atualizar o Supabase
 
-1. Crie um projeto no plano Free.
-2. Abra **SQL Editor**, crie uma consulta e execute o conteúdo completo de
-   `supabase/CONFIGURAR.sql`.
-3. Em **Storage**, confirme o bucket privado `ta-media`.
-4. Em **Project Settings → API**, copie o **Project URL** e uma chave secreta de
-   servidor (`sb_secret_...` ou `service_role` em Legacy API Keys).
+1. Crie um projeto dedicado no Supabase.
+2. No **SQL Editor**, execute `supabase/CONFIGURAR.sql`.
+3. Execute, nesta ordem:
+   - `supabase/FLUXOS-PARTE-1.sql`;
+   - `supabase/FLUXOS-PARTE-2.sql`;
+   - `supabase/FLUXOS-PARTE-3.sql`.
+4. Em **Storage**, confirme que `ta-media` é privado.
+5. Em **Project Settings → API**, copie o Project URL e uma chave secreta de
+   servidor (`sb_secret_...` ou `service_role` legada).
 
-Não use a chave `anon`/`publishable` no Render para esta instalação e nunca
-coloque a chave secreta em `dashboard/`, `extension/` ou no GitHub.
+Em uma instalação já existente, execute novamente `CONFIGURAR.sql` para liberar
+os novos tipos de arquivo e depois apenas as Partes ainda não aplicadas. As
+migrações são aditivas e repetíveis.
+
+Nunca use a chave `anon`/`publishable` no backend e nunca coloque a chave
+secreta em `dashboard/`, `extension/` ou no GitHub.
 
 ## 2. Publicar a API no Render
 
-1. Envie o conteúdo deste repositório ao GitHub, mantendo `render.yaml`,
-   `server`, `extension`, `dashboard` e `supabase` na raiz.
+1. Mantenha `render.yaml`, `server`, `extension`, `dashboard` e `supabase` na
+   raiz do repositório.
 2. No Render, escolha **New → Blueprint** e selecione o repositório.
-3. Preencha as variáveis solicitadas:
+3. Preencha:
 
 | Variável | Valor |
 |---|---|
@@ -34,83 +40,92 @@ coloque a chave secreta em `dashboard/`, `extension/` ou no GitHub.
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave secreta do Supabase |
 | `TELEGRAM_API_ID` | API ID de `my.telegram.org` |
 | `TELEGRAM_API_HASH` | API Hash de `my.telegram.org` |
-| `DASHBOARD_ORIGINS` | URL do dashboard; pode preencher depois |
-| `EXTENSION_PASSWORD` | Senha simples usada apenas para entrar na extensão |
+| `DASHBOARD_ORIGINS` | URL completa do dashboard |
+| `EXTENSION_PASSWORD` | Senha de entrada da extensão, mínimo 8 caracteres |
 
-O Blueprint gera `ACCESS_TOKEN` e `SESSION_ENCRYPTION_KEY`. Não troque esses
-valores entre deploys: a sessão Telegram é cifrada com o segundo segredo, e o
-ACCESS_TOKEN é usado pelo dashboard. A extensão usa `EXTENSION_PASSWORD`.
+O Blueprint gera `ACCESS_TOKEN` e `SESSION_ENCRYPTION_KEY`. Mantenha ambos
+estáveis entre deploys. O primeiro protege o dashboard; o segundo cifra a
+sessão Telegram persistida.
 
-Depois que o serviço ficar **Live**, copie a URL HTTPS da API. O Render Free
-pode dormir após inatividade; o primeiro acesso pode levar algum tempo.
+Depois do deploy, abra `/health`. Em seguida, autenticado pelo dashboard,
+confirme `/flow-capabilities`: a versão esperada é `3`.
+
+O estado é durável, mas uma hospedagem que suspenda o processo não executa
+timers enquanto estiver desligada. Ao voltar, o worker retoma do banco sem
+repetir envios confirmados. Para horários rigorosos e gatilhos sempre online,
+use uma instância que não hiberne.
 
 ## 3. Publicar o dashboard
 
-O Blueprint `render.yaml` já declara o Static Site `telegram-atendimento-dashboard`
-junto com a API. Ao criar ou sincronizar o Blueprint no Render, confirme que os
-dois serviços foram aplicados. Se o endereço abrir `404 Not Found` com
-`no-server`, o Static Site ainda não foi sincronizado ou está sem publicação.
+O Blueprint declara o Static Site `telegram-atendimento-dashboard`:
 
-A configuração equivalente é:
+- **Root Directory:** vazio;
+- **Build Command:** vazio;
+- **Publish Directory:** `dashboard`.
 
-- **Root Directory:** vazio (raiz do repositório)
-- **Build Command:** vazio
-- **Publish Directory:** `dashboard`
+Se usar outro domínio, inclua a origem HTTPS completa, sem barra final, em
+`DASHBOARD_ORIGINS` e publique a API novamente. Localhost é aceito apenas para
+desenvolvimento.
 
-Se você mantiver um domínio diferente do padrão, informe a origem completa, sem
-barra no final, em `DASHBOARD_ORIGINS` no serviço web da API e faça novo deploy.
-O endereço padrão `https://telegram-atendimento-dashboard.onrender.com` já é
-aceito pela API. Para teste local, execute um servidor estático na pasta
-`dashboard` em `http://localhost:4173`; essa origem também é aceita.
+No primeiro acesso, informe a URL HTTPS da API e o `ACCESS_TOKEN`. Depois:
 
-## 4. Instalar a extensão
+1. conecte a conta Telegram no cartão lateral;
+2. cadastre áudios, textos, imagens, vídeos ou arquivos;
+3. abra **Fluxos**, crie as etapas e escolha o gatilho;
+4. ative o fluxo;
+5. acompanhe cada lead em **Execuções por conversa**.
 
-1. Abra `chrome://extensions`.
-2. Ative **Modo do desenvolvedor**.
-3. Clique em **Carregar sem compactação** e selecione a pasta `extension`.
-4. Abra **Detalhes → Opções** da extensão.
-5. Digite a senha definida em `EXTENSION_PASSWORD`; autorize o acesso quando o
-   Chrome solicitar.
-6. Abra ou atualize o Telegram Web.
+## 4. Instalar ou atualizar a extensão
 
-Não haverá popup, painel lateral ou menu de administração. Ao abrir uma
-conversa privada compatível, a extensão identifica o destinatário pela URL e
-mostra apenas os áudios ativos em uma barra horizontal abaixo do campo de
-mensagem. Use as setas ou o deslizador para acessar os demais áudios. Um clique inicia o envio; durante a confirmação os botões ficam
-desabilitados para evitar duplicidade.
+1. Abra `chrome://extensions` e ative **Modo do desenvolvedor**.
+2. Use **Carregar sem compactação** e selecione `extension`.
+3. Se já estava instalada, clique em **Atualizar** no cartão da extensão.
+4. Abra **Detalhes → Opções**, informe a URL da API e `EXTENSION_PASSWORD`.
+5. Atualize o Telegram Web e abra uma conversa privada.
 
-A autenticação da conta Telegram continua sendo feita pela API e usa o mesmo
-fluxo existente, agora apresentado no dashboard. A extensão apenas consulta o
-destinatário atual e solicita o envio; ela não exibe formulário de login nem
-recebe a chave do Supabase.
+A barra preserva o envio manual de áudio com confirmação e indicador nativo de
+gravação. Na mesma barra é possível selecionar um fluxo, iniciar, pausar,
+continuar, cancelar, reiniciar, pular etapa ou assumir o atendimento.
 
-## 5. Supabase: é preciso criar algo novo?
+## 5. Criar um fluxo
 
-Não. A versão 4.0 reutiliza `public.ta_state` e o bucket privado `ta-media`.
+Exemplo:
 
-Ao iniciar, o backend migra metadados antigos para os campos `active`,
-`sortOrder` e `updatedAt`, preserva favoritos/arquivos e cria a categoria
-`Geral` no registro `categories` de `ta_state`. Não crie políticas públicas.
+1. Mensagem `Oi, {primeiro_nome}! Tudo bem?` com `digitando` por 3s.
+2. Espera de 2s.
+3. Áudio da biblioteca com `gravando áudio` por 4s.
+4. Esperar resposta por até 2 horas.
+5. Se não responder, enviar follow-up; se responder, continuar.
+6. Condição: resposta contém `sim`.
+7. Ramo positivo envia catálogo; ramo negativo transfere para humano.
+
+O estado de cada lead, a última resposta, os prazos e os IDs do Telegram ficam
+no Supabase. Editar um fluxo não altera execuções já iniciadas.
+
+Consulte [FLUXOS-PARTE-3.md](FLUXOS-PARTE-3.md) para variáveis, indicadores,
+gatilhos, garantias de concorrência e limitações oficiais do Telegram.
 
 ## 6. Limites e segurança
 
-- Uma mensagem de voz continua limitada a 50 MB na entrada e na saída.
-- O bucket `ta-media` permanece privado; o dashboard acessa prévias via API.
-- O ACCESS_TOKEN é administrativo e deve ficar apenas no dashboard privado.
-- A senha da extensão deve ter pelo menos 8 caracteres.
-- A extensão atende conversas privadas, como a versão anterior. Grupos,
-  canais e links fora de `web.telegram.org` são recusados.
-- O Render gratuito pode hibernar, e conversões podem demorar em arquivos
-  grandes. Aguarde o estado final antes de clicar novamente.
+- Upload máximo de 50 MB.
+- Conversas privadas somente; grupos e canais são recusados.
+- O bucket é privado e prévias passam pela API autenticada.
+- Apenas o backend usa a chave secreta do Supabase.
+- Um único fluxo ativo pode ocupar uma conversa.
+- Resultado de envio incerto exige conferência humana e nunca é repetido.
+- O limite de transições interrompe loops.
+- Ação manual pode pausar automaticamente a automação.
 
-## 7. Teste local do backend
+## 7. Testar localmente
 
-Na pasta `server`, com Node.js 20 ou superior:
+Com Node.js 20 ou superior, na pasta `server`:
 
 ```bash
 npm ci
 FFMPEG_PATH=/usr/bin/ffmpeg npm test
 ```
 
-Os testes usam clientes e armazenamento simulados; login real, SQL real e
-envio real precisam ser validados nas suas contas.
+A suíte aplica as três migrações em PostgreSQL embutido e cobre isolamento por
+lead, respostas, timeout, ramificação, gatilhos, indicadores, deduplicação,
+reconexão, pausa humana, arquivos, dashboard e extensão. Login e envio reais
+devem receber um teste final na conta Telegram da operação.
