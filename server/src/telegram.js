@@ -3,6 +3,7 @@ import path from "node:path";
 import {encodeSession,decodeSession} from "./session-store.js";
 import { TelegramClient, Api } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
+import {resolveActivityPlan, runTelegramActivity} from "./activity.js";
 
 class Deferred {
   constructor() {
@@ -126,9 +127,6 @@ export class TelegramService {
           if (seconds) {
             this.authRetryAt = Math.max(this.authRetryAt, Date.now() + seconds * 1000);
           }
-          // teleproto retries authentication while onError returns false.
-          // Flood waits and terminal account/configuration errors must end
-          // this attempt; retrying them can extend the block or loop forever.
           return true;
         }
         return false;
@@ -150,8 +148,6 @@ export class TelegramService {
       .catch(err => {
         this.pending = null;
         this.state = "error";
-        // teleproto rejects with AUTH_USER_CANCEL after onError asks it to
-        // stop. Keep the useful Telegram error captured by the callback.
         if (!this.lastError) this.lastError = this.friendlyError(err);
       })
       .finally(() => {
@@ -289,10 +285,6 @@ export class TelegramService {
 
     let entity;
     if (key.startsWith('@')) {
-      // Use the direct username lookup first. Loading the full dialog list can
-      // be slow on a sleeping Render instance, which used to leave the
-      // extension stuck on “Identificando…”. The dialog list is only a
-      // fallback for accounts where the username lookup is not enough.
       entity = this.findDialogByUsername(key);
       if (!entity) {
         try {
@@ -331,8 +323,6 @@ export class TelegramService {
       return this.dialogMap.get(String(dialogId));
     }
 
-    // A single failed refresh must not prevent the direct entity lookup.
-    // This matters after a Render wake-up or when Telegram omits a dialog.
     try { await this.getDialogs(100); } catch {}
     if (this.dialogMap.has(String(dialogId))) {
       return this.dialogMap.get(String(dialogId));
@@ -345,7 +335,6 @@ export class TelegramService {
     }
   }
 
-  // Durable waiting uses Telegram history, not browser events or untrusted webhooks.
   async flowReplyBaseline(dialogId) {
     const entity=await this.resolveTarget({dialogId});
     if(entity?.className!=='User')throw new Error('A espera aceita somente conversas privadas.');
@@ -360,7 +349,6 @@ export class TelegramService {
     const me=await this.client.getMe();
     if(String(me.id)!==run.reply_account_id)throw new Error('A conta Telegram mudou. Reconecte a conta original para continuar.');
     const checkedAt=new Date().toISOString();
-    // Ascending pagination prevents losing a reply behind a large offline backlog.
     const rows=await this.client.getMessages(entity,{limit:100,minId:Number(run.reply_cursor||0),reverse:true});
     let cursor=Number(run.reply_cursor||0);const messages=[];
     for(const message of rows){
@@ -374,33 +362,59 @@ export class TelegramService {
     return {accountId:String(me.id),messages,cursor,complete:rows.length<100,checkedAt};
   }
 
-  async sendItem(item, target, {recordingDelay = 0} = {}) {
+  chatActionFor(plan) {
+    if (plan?.action === 'typing') return new Api.SendMessageTypingAction();
+    if (plan?.action === 'record') return new Api.SendMessageRecordAudioAction();
+    return new Api.SendMessageCancelAction();
+  }
+
+  async setChatAction(entity, action) {
+    await this.client.invoke(new Api.messages.SetTyping({peer: entity, action}));
+  }
+
+  async simulateActivity(item, target, options = {}) {
+    const plan = resolveActivityPlan(item, options);
+    if (!plan.delayMs) return plan;
     const entity = await this.resolveTarget(target);
+    await runTelegramActivity({
+      sendAction: () => this.setChatAction(entity, this.chatActionFor(plan)),
+      cancelAction: () => this.setChatAction(entity, new Api.SendMessageCancelAction()),
+      delayMs: plan.delayMs,
+      renewEveryMs: plan.renewEveryMs,
+      signal: options.signal,
+      shouldContinue: options.shouldContinue
+    });
+    return plan;
+  }
+
+  async sendItem(item, target, options = {}) {
+    const entity = await this.resolveTarget(target);
+    const {recordingDelay = 0, skipActivity = false} = options;
+    if (!skipActivity) {
+      await this.simulateActivity(item, target, {...options, recordingDelay});
+    }
+    if (options.signal?.aborted) {
+      const error = new Error('Atividade interrompida antes do envio.');
+      error.name = 'ActivityAbortedError';
+      throw error;
+    }
     let result;
     if (item.kind === "text") {
       result = await this.client.sendMessage(entity, { message: item.text, parseMode: false });
     } else {
       const voice = !item.kind || item.kind === "voice";
-      const options = { file: item.path, workers: 1, parseMode: false };
+      const sendOptions = { file: item.path, workers: 1, parseMode: false };
       if (voice) {
-        options.voiceNote = true;
-        options.attributes = [new Api.DocumentAttributeAudio({
+        sendOptions.voiceNote = true;
+        sendOptions.attributes = [new Api.DocumentAttributeAudio({
           voice: true, duration: Math.max(1, Math.round(item.duration || 1))
         })];
-        const delayMs = Math.min(15000, Math.max(0, Number(recordingDelay) * 1000 || 0));
-        if (delayMs) {
-          await this.client.invoke(new Api.messages.SetTyping({
-            peer: entity,
-            action: new Api.SendMessageRecordAudioAction()
-          }));
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
       }
       if (item.kind === 'video') {
-        options.supportsStreaming = true;
-        options.attributes = [new Api.DocumentAttributeVideo({duration: item.duration || 1, w:item.width || 2, h:item.height || 2, supportsStreaming:true})];
+        sendOptions.supportsStreaming = true;
+        sendOptions.attributes = [new Api.DocumentAttributeVideo({duration: item.duration || 1, w:item.width || 2, h:item.height || 2, supportsStreaming:true})];
       }
-      result = await this.client.sendFile(entity, options);
+      result = await this.client.sendFile(entity, sendOptions);
     }
     if (!result?.id) throw new Error("O Telegram não confirmou o envio. Confira a conversa antes de tentar novamente.");
     return { messageId: String(result.id) };
