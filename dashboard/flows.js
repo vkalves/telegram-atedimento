@@ -1,6 +1,14 @@
 // Independent view: no changes to the library/editor data model.
 export function setupFlows({api,element,button,showToast,getItems}) {
  const $=id=>document.getElementById(id);
+ const typingField=(step,key)=>{
+  const label=element('label','Digitando… (segundos, vazio = automático)');
+  const field=element('input');
+  field.type='number';field.min=1;field.max=20;field.placeholder='automático';field.setAttribute('aria-label','Tempo de digitando em segundos');
+  if(Number.isInteger(step[key])&&step[key]>0)field.value=step[key];
+  field.oninput=()=>{const value=Number(field.value);if(Number.isInteger(value)&&value>=1&&value<=20)step[key]=value;else delete step[key];};
+  label.append(field);return label;
+ };
  let flows=[],editing=null,steps=[],loading=false;
  const labels={running:'Em execução',waiting:'Aguardando',sending:'Enviando',done:'Concluído',error:'Erro',uncertain:'Conferir envio',cancelled:'Cancelado',arming_reply:'Preparando espera',awaiting_reply:'Aguardando resposta',paused:'Pausado'};
  const commandRequests=new Map(),commandBusy=new Set();
@@ -68,11 +76,12 @@ export function setupFlows({api,element,button,showToast,getItems}) {
     for(const [value,title] of [['end','Encerrar fluxo'],['next','Continuar para a próxima etapa'],['followup','Enviar um follow-up e continuar']])action.add(new Option(title,value));
     action.value=step.timeoutAction||'end';actionLabel.append(action);
     const followLabel=element('label','Texto do follow-up');const follow=element('textarea');follow.rows=3;follow.maxLength=4096;follow.value=step.followupText||'';follow.oninput=()=>step.followupText=follow.value;followLabel.append(follow);followLabel.hidden=action.value!=='followup';
-    action.onchange=()=>{step.timeoutAction=action.value;followLabel.hidden=action.value!=='followup';};
-    options.append(limitLabel,element('small','Exemplo: 7200 segundos = 2 horas. O follow-up é enviado uma única vez.'),actionLabel,followLabel);row.append(options);
+    const followTyping=typingField(step,'followupTypingSeconds');followTyping.hidden=action.value!=='followup';
+    action.onchange=()=>{step.timeoutAction=action.value;followLabel.hidden=action.value!=='followup';followTyping.hidden=action.value!=='followup';};
+    options.append(limitLabel,element('small','Exemplo: 7200 segundos = 2 horas. O follow-up é enviado uma única vez.'),actionLabel,followLabel,followTyping);row.append(options);
    }
    else{input=element('select');input.add(new Option('Selecione um áudio',''));const items=getItems().filter(item=>item.active!==false&&item.storedName);for(const item of items)input.add(new Option(item.name,item.id));if(step.audioId&&!items.some(i=>i.id===step.audioId))input.add(new Option('Áudio indisponível — selecione outro',step.audioId));input.value=step.audioId;input.onchange=()=>step.audioId=input.value;}
-   input.required=true;input.setAttribute('aria-label',step.type==='reply'?'Prazo da resposta em segundos':step.type==='wait'?'Tempo em segundos':step.type==='audio'?'Áudio':'Mensagem');if(step.type!=='reply')row.append(input);
+   input.required=true;input.setAttribute('aria-label',step.type==='reply'?'Prazo da resposta em segundos':step.type==='wait'?'Tempo em segundos':step.type==='audio'?'Áudio':'Mensagem');if(step.type!=='reply')row.append(input);if(step.type==='text')row.append(typingField(step,'typingSeconds'));
    const actions=element('div',undefined,'flow-actions');
    const up=button('↑ Subir',()=>{[steps[index-1],steps[index]]=[steps[index],steps[index-1]];renderSteps();});up.disabled=index===0;
    const down=button('↓ Descer',()=>{[steps[index+1],steps[index]]=[steps[index],steps[index+1]];renderSteps();});down.disabled=index===steps.length-1;
