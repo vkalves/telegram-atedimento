@@ -3,19 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Telegram Atendimento · Entrar</title>
+  <title>Telegram Atendimento 6.0 · Entrar</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
   <main class="card">
-    <div class="brand"><span class="brand-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2M6 10h12v10H6z"/></svg></span><div><h1>Entrar</h1><p>Telegram Atendimento <span>4.0</span></p></div></div>
-    <div id="notice" class="notice" role="status">Digite sua senha para acessar os áudios.</div>
+    <div class="brand"><span class="brand-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2M6 10h12v10H6z"/></svg></span><div><h1>Entrar</h1><p>Telegram Atendimento <span>6.0</span></p></div></div>
+    <div id="notice" class="notice" role="status">Digite sua senha para acessar áudios e fluxos.</div>
     <form id="form">
       <label>Senha<input id="token" type="password" required autocomplete="current-password" placeholder="Digite sua senha"></label>
+      <label>Endereço do dashboard<input id="dashboardUrl" type="url" required autocomplete="url" placeholder="https://telegram-atendimento-dashboard.onrender.com"></label>
       <button id="save" type="submit">Entrar</button>
       <button id="clear" class="secondary" type="button" hidden>Sair deste navegador</button>
     </form>
-    <p class="hint">Você precisa entrar somente uma vez neste navegador.</p>
+    <p class="hint">Você precisa entrar somente uma vez neste navegador. O endereço do dashboard já vem preenchido; altere-o apenas se publicou a dashboard em outro endereço.</p>
   </main>
   <script type="module" src="options.js"></script>
 </body>

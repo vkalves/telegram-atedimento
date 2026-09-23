@@ -12,7 +12,12 @@ grant select, insert, update, delete on table public.ta_state to service_role;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'ta-media', 'ta-media', false, 52428800,
-  array['audio/ogg','video/mp4','image/jpeg','image/png']
+  array[
+    'audio/ogg','video/mp4','image/jpeg','image/png','application/pdf','application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain','text/csv','application/zip'
+  ]
 )
 on conflict (id) do update set
   public = false,
@@ -21,5 +26,6 @@ on conflict (id) do update set
 commit;
 -- Não crie políticas públicas para ta_state ou ta-media.
 -- A biblioteca, favoritos, ordem, status e categorias são payloads JSON nessa tabela;
--- a versão 4.0 não exige tabelas adicionais nem acesso direto do navegador ao Storage.
+-- Os scripts FLUXOS-PARTE-1.sql, FLUXOS-PARTE-2.sql e FLUXOS-PARTE-3.sql criam
+-- separadamente as tabelas privadas do motor de automação.
 -- A chave de servidor fica exclusivamente nas variáveis de ambiente do Render.

@@ -1,0 +1,78 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {FlowWorker,FlowStore,validateFlow} from './flows.js';
+import {createApp} from './app.js';
+const voice={id:'audio-1',kind:'voice',active:true,storedName:'audio.ogg',path:'/existing/audio.ogg'};
+const run={id:'run',claim_token:'token',dialog_id:'123',current_step:0,snapshot:{steps:[{type:'audio',audioId:voice.id}]}};
+function fixture(){const sent=[],results=[];return {sent,results,flows:{finish:async(...args)=>results.push(args)},library:{get:async()=>voice},telegram:{requireAuthorized:async()=>{},resolveTarget:async()=>{},sendItem:async(...args)=>{sent.push(args);return {messageId:'42'};},friendlyError:e=>e.message},logger:{error:()=>{}}};}
+test('validates legacy types, assigns stable metadata and rejects missing audio',()=>{
+ const input={name:'Teste',active:true,steps:[{type:'text',text:'Olá {nome}'},{type:'wait',seconds:3},{type:'audio',audioId:voice.id}]};
+ const valid=validateFlow(input,[voice]);assert.equal(valid.name,input.name);assert.deepEqual(valid.steps.map(step=>step.type),['text','wait','audio']);assert.ok(valid.steps.every(step=>step.id));assert.equal(valid.steps[0].activity.type,'typing');assert.equal(valid.steps[2].activity.type,'record-audio');
+ for(const step of [{type:'typing'},{type:'wait',seconds:-1},{type:'wait',seconds:1.1},{type:'text',text:''},{type:'audio',audioId:'missing'}])assert.throws(()=>validateFlow({...input,steps:[step]},[voice]));
+ assert.throws(()=>validateFlow(input,[{...voice,active:false}]));
+});
+test('worker reuses existing voice library and sender without recording indicators',async()=>{
+ const f=fixture();await new FlowWorker(f).execute(run);
+ assert.deepEqual(f.sent,[[voice,{dialogId:'123'}]]);assert.equal(f.results[0][1],'completed');assert.equal(f.results[0][2],'42');
+});
+test('missing audio fails before sending; external failures are uncertain and never retried',async()=>{
+ const f=fixture();f.library.get=async()=>null;await new FlowWorker(f).execute(run);assert.equal(f.sent.length,0);assert.equal(f.results[0][1],'error');
+ f.results.length=0;f.library.get=async()=>voice;f.telegram.sendItem=async()=>{f.sent.push('attempt');throw Error('timeout');};await new FlowWorker(f).execute(run);assert.equal(f.sent.length,1);assert.equal(f.results[0][1],'uncertain');
+});
+test('a template that becomes blank fails before dispatch and cannot create an uncertain send',async()=>{
+ const events=[];let dispatched=0,sent=0;
+ const worker=new FlowWorker({
+  flows:{version:3,dispatch:async()=>{dispatched++;return true;},finish:async(_run,status,_message,error)=>events.push({status,error})},
+  telegram:{requireAuthorized:async()=>{},resolveTarget:async()=>{},sendItem:async()=>{sent++;return {messageId:'1'};},friendlyError:error=>error.message},
+  library:{}
+ });
+ await worker.execute({id:'run',dialog_id:'123',target:{id:'123',name:'Lead'},claim_token:'token',current_step:0,status:'sending',snapshot:{steps:[{type:'text',text:' {telefone} ',activity:{enabled:false}}]}});
+ assert.equal(dispatched,0);assert.equal(sent,0);assert.equal(events[0].status,'error');assert.match(events[0].error,/ficou vazia/);
+});
+test('DB failure after Telegram success never repeats the send',async()=>{
+ const f=fixture();let attempts=0;f.flows.finish=async()=>{attempts++;throw Error('DB down');};await new FlowWorker(f).execute(run);assert.equal(f.sent.length,1);assert.equal(attempts,2);
+});
+test('a slow recipient does not block the next worker poll or another recipient',async()=>{
+ const f=fixture();let unblock;const blocked=new Promise(resolve=>unblock=resolve);let calls=0;
+ f.flows.claim=async()=>++calls===1?[run]:calls===2?[{...run,id:'second',dialog_id:'456'}]:[];
+ f.telegram.sendItem=async(item,target)=>{f.sent.push(target.dialogId);if(target.dialogId==='123')await blocked;return {messageId:'1'};};
+ const worker=new FlowWorker(f);await worker.tick();await worker.tick();await new Promise(r=>setImmediate(r));assert.deepEqual(f.sent,['123','456']);assert.equal(f.results[0][0].dialog_id,'456');unblock();await Promise.all(worker.pending);
+});
+test('flow API requires authentication, binds recipient and persists start arguments',async()=>{
+ let starts=0;const token='a'.repeat(32),telegram={currentTarget:async()=>({id:'123',name:'A'}),friendlyError:e=>e.message};
+ const app=createApp({telegram,library:{uploadDir:'/tmp'},sequences:{},token,flows:{start:async(body,target)=>{starts++;return {id:body.requestId,dialog_id:target.id};},list:async()=>[]}});
+ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));const base=`http://127.0.0.1:${server.address().port}`;
+ try{
+  assert.equal((await fetch(base+'/flows')).status,401);
+  const post=body=>fetch(base+'/flow-runs',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  assert.equal((await post({dialogId:'999',peerKey:'123'})).status,400);assert.equal(starts,0);
+  assert.equal((await post({dialogId:'123',peerKey:'123',requestId:'id'})).status,200);assert.equal(starts,1);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});
+test('flow API rejects malformed and oversized JSON before any state mutation',async()=>{
+ let saves=0;const token='b'.repeat(32),telegram={friendlyError:error=>error.message,status:async()=>({authorized:false})};
+ const app=createApp({telegram,library:{uploadDir:'/tmp'},sequences:{},token,flows:{save:async()=>{saves++;},list:async()=>[]}}),server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+ const base=`http://127.0.0.1:${server.address().port}`,headers={Authorization:'Bearer '+token,'Content-Type':'application/json'};
+ try{
+  let response=await fetch(base+'/flows',{method:'POST',headers,body:'{"name":'});assert.equal(response.status,400);assert.match((await response.json()).error,/JSON.*inválido/i);
+  response=await fetch(base+'/flows',{method:'POST',headers,body:JSON.stringify({padding:'x'.repeat(1024*1024+10)})});assert.equal(response.status,413);assert.match((await response.json()).error,/excede 1 MB/i);
+  assert.equal(saves,0);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});
+test('flow REST adapter sends only server-authenticated calls and guards update revisions',async()=>{
+ const calls=[];const flows=new FlowStore({request:async(...args)=>{calls.push(args);return [];}});
+ await assert.rejects(flows.save({name:'A',active:true,steps:[{type:'wait',seconds:1}],revision:2},{list:async()=>[]},'8cf3106d-655b-4b14-91fb-83d389a15902'),/outra janela/);
+ assert.match(calls[0][0],/revision=eq.2/);
+ assert.throws(()=>flows.runs('1&select=*'),/inválida/);
+});
+
+test('worker initialization fails closed when Parte 2 database capability is unavailable',async()=>{
+ const unavailable=new FlowStore({request:async route=>{if(route.includes('capabilities'))throw Error('DB offline');return [];}});
+ await assert.rejects(unavailable.init(),/DB offline/);assert.equal(unavailable.version,1);
+ const ready=new FlowStore({request:async route=>route.includes('capabilities')?{version:2}:[]});await ready.init();assert.equal(ready.version,2);
+});
+
+
+test('single-run RPCs normalize PostgREST composite rows without flattening work queues',async()=>{
+ const row={id:'run'};const flows=new FlowStore({request:async()=>[row]});assert.deepEqual(await flows.rpc('start'),row);assert.deepEqual(await flows.rpc('control'),row);assert.deepEqual(await flows.claim(),[row]);assert.deepEqual(await flows.watch(),[row]);
+});

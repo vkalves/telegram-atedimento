@@ -61,3 +61,13 @@ test('4.0 replaces a voice file without losing its metadata', {skip:!process.env
     assert.equal(replaced.name,'Alô');assert.notEqual(replaced.storedName,item.storedName);assert.ok(replaced.duration>=2);assert.equal((await library.list())[0].id,item.id);assert.equal((await fs.readFile(path.join(dir,'library',item.storedName)).catch(()=>null)),null);
   }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
+
+test('6.0 library stores and replaces private document content',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'telegram-atendimento-file-v6-'));
+ try{
+  const first=path.join(dir,'catalogo.pdf'),second=path.join(dir,'catalogo-novo.pdf');await fs.writeFile(first,'%PDF-1.4 primeiro');await fs.writeFile(second,'%PDF-1.4 segundo');
+  const library=new VoiceLibrary(dir);await library.init();const item=await library.add({path:first,originalname:'Catálogo.pdf'},{kind:'file',name:'Catálogo',category:'Vendas'});
+  assert.equal(item.kind,'file');assert.equal(item.originalName,'Catálogo.pdf');assert.match(item.storedName,/\.pdf$/);assert.equal((await fs.readFile((await library.get(item.id)).path,'utf8')),'%PDF-1.4 primeiro');
+  const replaced=await library.replaceFile(item.id,{path:second,originalname:'Catálogo 2026.pdf'});assert.equal(replaced.originalName,'Catálogo 2026.pdf');assert.equal(replaced.name,'Catálogo');assert.equal((await fs.readFile((await library.get(item.id)).path,'utf8')),'%PDF-1.4 segundo');
+ }finally{await fs.rm(dir,{recursive:true,force:true});}
+});

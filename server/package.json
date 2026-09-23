@@ -1,15 +1,15 @@
 {
   "name": "telegram-voice-local-server",
-  "version": "4.0.0",
+  "version": "6.0.0",
   "private": true,
   "type": "module",
-  "description": "Telegram Atendimento 4.0: API privada, dashboard e extensão de áudios",
+  "description": "Telegram Atendimento 6.0: conteúdos e fluxos automatizados persistentes",
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test src/*.test.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19.0"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -21,5 +21,9 @@
   },
   "overrides": {
     "mime": "3.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "jsdom": "29.0.1"
   }
 }

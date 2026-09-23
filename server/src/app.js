@@ -4,7 +4,7 @@ import multer from 'multer';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import {Jobs} from './jobs.js';
-export function createApp({telegram,library,sequences,categories=null,token,extensionPassword='',extensionIds=[],dashboardOrigins=[]}){
+export function createApp({telegram,library,sequences,categories=null,flows=null,token,extensionPassword='',extensionIds=[],dashboardOrigins=[]}){
  if(!token||token.length<32)throw new Error('Configure um ACCESS_TOKEN com pelo menos 32 caracteres.');
  if(extensionPassword&&extensionPassword.length<8)throw new Error('Configure EXTENSION_PASSWORD com pelo menos 8 caracteres.');
  const app=express(),jobs=new Jobs(telegram,library),rates=new Map(),loginRates=new Map();
@@ -17,7 +17,7 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
  app.use((req,res,next)=>{
   res.set('Cache-Control','no-store');
   if(!allowed(req.get('Origin')))return res.status(403).json({error:'Origem não autorizada.'});
-  if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'4.0.4',apiVersion:'3.0.1',extensionPasswordConfigured:!!extensionPassword});
+  if(req.path==='/health'&&req.method==='GET')return res.json({ok:true,version:'6.0.0',apiVersion:'4.0.0',extensionPasswordConfigured:!!extensionPassword});
   const origin=req.get('Origin')||'',supplied=Buffer.from(req.get('Authorization')||'');
   const matches=secret=>{const expected=Buffer.from('Bearer '+secret);return supplied.length===expected.length&&crypto.timingSafeEqual(supplied,expected);};
   const extensionOrigin=/^chrome-extension:\/\/([a-p]{32})$/.exec(origin);
@@ -59,12 +59,29 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
  app.patch('/library/reorder',async(q,r)=>r.json({items:await library.reorder(q.body?.ids)}));
  app.patch('/library/:id',async(q,r)=>{if(categories&&q.body.category!==undefined)await categories.ensure(q.body.category);r.json({item:await library.update(q.params.id,q.body)});});
  app.post('/library/:id/file',upload.single('file'),async(q,r)=>{try{r.json({item:await library.replaceFile(q.params.id,q.file)});}finally{if(q.file)await fs.rm(q.file.path,{force:true}).catch(()=>{});}});
- app.delete('/library/:id',async(q,r)=>{if([...jobs.jobs.values()].some(j=>j.state==='running'))throw new Error('Aguarde ou pare os envios antes de excluir itens.');r.json({ok:await library.remove(q.params.id)});});
+ app.delete('/library/:id',async(q,r)=>{if([...jobs.jobs.values()].some(j=>j.state==='running'))throw new Error('Aguarde ou pare os envios antes de excluir itens.');if(flows&&await flows.usesLibraryItem?.(q.params.id))throw new Error('Este conteúdo é usado por um fluxo. Remova-o do fluxo antes de excluir.');r.json({ok:await library.remove(q.params.id)});});
  app.get('/library/:id/preview',async(q,r)=>{const item=await library.get(q.params.id);if(!item?.path)return r.status(404).json({error:'Arquivo não encontrado.'});r.sendFile(item.path);});
  app.get('/categories',async(_q,r)=>r.json({categories:categories?await categories.list():[]}));
  app.post('/categories',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({category:await categories.add(q.body)});});
  app.patch('/categories/:id',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({category:await categories.rename(q.params.id,q.body)});});
  app.delete('/categories/:id',async(q,r)=>{if(!categories)throw new Error('Categorias não estão disponíveis nesta instalação.');r.json({ok:await categories.remove(q.params.id)});});
+ // Fluxos são opcionais para preservar instalações durante a migração SQL.
+ app.use(['/flows','/flow-runs','/flow-capabilities'],(_q,r,next)=>flows?next():r.status(503).json({error:'Aplique as migrações FLUXOS-PARTE-1.sql, PARTE-2.sql e PARTE-3.sql e reinicie o servidor.'}));
+ app.get('/flow-capabilities',async(_q,r)=>r.json(flows.capabilities()));
+ app.get('/flows',async(_q,r)=>r.json({flows:await flows.list()}));
+ app.post('/flows',async(q,r)=>r.json({flow:await flows.save(q.body,library)}));
+ app.patch('/flows/:id',async(q,r)=>r.json({flow:await flows.save(q.body,library,q.params.id)}));
+ app.post('/flows/:id/duplicate',async(q,r)=>r.json({flow:await flows.duplicate(q.params.id,library)}));
+ app.delete('/flows/:id',async(q,r)=>r.json({ok:await flows.remove(q.params.id)}));
+ app.get('/flow-runs',async(q,r)=>{const rows=await flows.runs(q.query.dialogId);if(!flows.describe)return r.json({runs:rows});const items=await library.list();r.json({runs:await Promise.all(rows.map(run=>flows.describe(run,library,items)))});});
+ app.get('/flow-runs/:id/logs',async(q,r)=>r.json({logs:await flows.logs(q.params.id)}));
+ app.post('/flow-runs',async(q,r)=>{
+  const target=await telegram.currentTarget(String(q.body.peerKey||''));
+  if(target.id!==String(q.body.dialogId))throw new Error('A conversa mudou. Selecione o fluxo novamente.');
+  r.json({run:await flows.start(q.body,target)});
+ });
+ app.post('/flow-runs/:id/control',async(q,r)=>r.json({run:await flows.control(q.params.id,q.body)}));
+ app.post('/flow-runs/:id/cancel',async(q,r)=>r.json({run:await flows.cancel(q.params.id)}));
  app.get('/sequences',async(_q,r)=>r.json({sequences:await sequences.list()}));
  app.post('/sequences',async(q,r)=>r.json({sequence:await sequences.save(q.body)}));
  app.delete('/sequences/:id',async(q,r)=>r.json({ok:await sequences.remove(q.params.id)}));
@@ -77,9 +94,9 @@ export function createApp({telegram,library,sequences,categories=null,token,exte
  app.get('/jobs',(_q,r)=>r.json({jobs:[...jobs.jobs.keys()].map(id=>jobs.get(id))}));
  app.post('/jobs/:id/cancel',(q,r)=>r.json({job:jobs.cancel(q.params.id)}));
  app.use((err,_q,r,_n)=>{
-  const messages={LIMIT_FILE_SIZE:'O arquivo excede 50 MB.',LIMIT_FIELD_SIZE:'Os dados do formulário excedem o limite permitido.',LIMIT_FIELD_COUNT:'O formulário contém campos demais.',LIMIT_PART_COUNT:'O formulário contém partes demais.',LIMIT_UNEXPECTED_FILE:'Campo de arquivo inesperado.'};
+  const messages={LIMIT_FILE_SIZE:'O arquivo excede 50 MB.',LIMIT_FIELD_SIZE:'Os dados do formulário excedem o limite permitido.',LIMIT_FIELD_COUNT:'O formulário contém campos demais.',LIMIT_PART_COUNT:'O formulário contém partes demais.',LIMIT_UNEXPECTED_FILE:'Campo de arquivo inesperado.','entity.too.large':'A requisição excede 1 MB.','entity.parse.failed':'O JSON enviado é inválido.'};
   const message=messages[err.code]||telegram.friendlyError(err);
-  r.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:message});
+  r.status(err.code==='LIMIT_FILE_SIZE'||err.type==='entity.too.large'?413:400).json({error:messages[err.type]||message});
  });
  return app;
 }

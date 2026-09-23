@@ -15,6 +15,13 @@ test('error bodies never expose provider data and arbitrary object paths are ref
  await assert.rejects(store.getState('library'),e=>e.message.includes('403')&&!e.message.includes('sensitive'));
  assert.throws(()=>store.objectPath('../session.enc'));assert.throws(()=>store.objectPath('https://example.com/a.png'));
 });
+test('every library file format has a private storage path',()=>{
+ const store=new SupabaseStore({url:'https://example.supabase.co',key:'secret'}),id='123e4567-e89b-12d3-a456-426614174000';
+ for(const extension of ['ogg','mp4','jpg','jpeg','png','pdf','doc','docx','xls','xlsx','txt','csv','zip']){
+  assert.equal(store.objectPath(`${id}.${extension}`),`/storage/v1/object/ta-media/${id}.${extension}`);
+ }
+ for(const name of [`${id}.exe`,`${id}.PDF`,'../catalogo.pdf','catalogo com espaco.pdf'])assert.throws(()=>store.objectPath(name));
+});
 test('private media downloads use the authenticated route and stream to disk',async()=>{
  const fs=await import('node:fs/promises'),os=await import('node:os'),path=await import('node:path');
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sb-adapter-'));let called;
@@ -23,4 +30,13 @@ test('private media downloads use the authenticated route and stream to disk',as
   const file=path.join(dir,'a.ogg');await store.download('abc-123.ogg',file);
   assert.match(called,/\/object\/authenticated\/ta-media\/abc-123.ogg$/);assert.equal(await fs.readFile(file,'utf8'),'audio-bytes');
  }finally{await fs.rm(dir,{recursive:true,force:true});}
+});
+
+
+test('only allowlisted SQL application errors are exposed by flow controls',async()=>{
+ const message='Execução mudou. Atualize antes de repetir o comando.';
+ const store=new SupabaseStore({url:'https://example.supabase.co',key:'test',fetchImpl:async()=>new Response(JSON.stringify({code:'P0001',message}),{status:400})});
+ await assert.rejects(store.request('/rest/v1/rpc/ta_flow_control',{safeErrors:[message]}),e=>e.message===message);
+ store.fetch=async()=>new Response(JSON.stringify({code:'P0001',message:'private provider details'}),{status:400});
+ await assert.rejects(store.request('/rest/v1/rpc/ta_flow_control',{safeErrors:[message]}),e=>!e.message.includes('private provider'));
 });

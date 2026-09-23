@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#f5f8fb">
-  <title>Telegram Atendimento 4.0 · Dashboard</title>
+  <title>Telegram Atendimento 6.0 · Dashboard</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="connectionGate" class="gate" hidden>
     <section class="gate-card">
-      <div class="brand large"><span class="brand-mark">♫</span><div><strong>Telegram Atendimento <small>4.0</small></strong><span>Biblioteca de áudios</span></div></div>
+      <div class="brand large"><span class="brand-mark">↳</span><div><strong>Telegram Atendimento <small>6.0</small></strong><span>Conteúdos e automações</span></div></div>
       <h1>Conecte seu dashboard</h1>
       <p class="muted">Use o endereço do Render e o ACCESS_TOKEN configurado no servidor. A extensão usa a senha separada EXTENSION_PASSWORD.</p>
       <form id="connectionForm" class="stack-form">
@@ -25,12 +25,13 @@
   <div id="appShell" class="app-shell" hidden>
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-top">
-        <div class="brand"><span class="brand-mark">♫</span><div><strong>Atendimento <small>4.0</small></strong><span>Central de áudios</span></div></div>
+        <div class="brand"><span class="brand-mark">↳</span><div><strong>Atendimento <small>6.0</small></strong><span>Central de automações</span></div></div>
         <button id="closeSidebar" class="icon-button mobile-only" type="button" aria-label="Fechar menu">×</button>
       </div>
       <nav class="navigation" aria-label="Navegação do dashboard">
         <button class="nav-item active" data-view="library" type="button"><span class="nav-icon">▦</span> Biblioteca <span id="navAudioCount" class="nav-count">0</span></button>
         <button class="nav-item" data-view="categories" type="button"><span class="nav-icon">▤</span> Categorias</button>
+      <button class="nav-item" data-view="flows" type="button"><span class="nav-icon">↳</span> Fluxos</button>
       </nav>
       <div class="telegram-card"><div class="telegram-card-heading"><span id="telegramStatusDot" class="telegram-dot loading"></span><div><strong id="telegramStatusText">Verificando Telegram…</strong><small id="telegramAccountText">Aguarde um instante</small></div></div><button id="connectTelegram" class="sidebar-action" type="button">Conectar conta</button></div>
       <div class="sidebar-bottom">
@@ -42,41 +43,46 @@
 
     <main class="main-content">
       <header class="topbar">
-        <div class="topbar-heading"><button id="openSidebar" class="icon-button mobile-only" type="button" aria-label="Abrir menu">☰</button><div><p class="eyebrow">BIBLIOTECA DE ÁUDIOS</p><h1 id="pageTitle">Organize seu atendimento</h1><p class="subtitle">Deixe as respostas certas a um clique da conversa.</p></div></div>
-        <div class="topbar-actions"><button id="refresh" class="secondary-button" type="button">↻ <span>Atualizar</span></button><button id="newAudio" class="primary" type="button">+ Novo áudio</button></div>
+        <div class="topbar-heading"><button id="openSidebar" class="icon-button mobile-only" type="button" aria-label="Abrir menu">☰</button><div><p class="eyebrow">ATENDIMENTO AUTOMATIZADO</p><h1 id="pageTitle">Organize seu atendimento</h1><p class="subtitle">Conteúdos reutilizáveis e conversas automatizadas por lead.</p></div></div>
+        <div class="topbar-actions"><button id="refresh" class="secondary-button" type="button">↻ <span>Atualizar</span></button><button id="newAudio" class="primary" type="button">+ Novo conteúdo</button></div>
       </header>
 
       <section id="libraryView" class="view">
         <div class="stats-grid">
-          <article class="stat-card"><span class="stat-icon blue">♫</span><div><strong id="totalCount">0</strong><span>Total de áudios</span></div></article>
-          <article class="stat-card"><span class="stat-icon green">✓</span><div><strong id="activeCount">0</strong><span>Ativos na extensão</span></div></article>
+          <article class="stat-card"><span class="stat-icon blue">▦</span><div><strong id="totalCount">0</strong><span>Total de conteúdos</span></div></article>
+          <article class="stat-card"><span class="stat-icon green">✓</span><div><strong id="activeCount">0</strong><span>Conteúdos ativos</span></div></article>
           <article class="stat-card"><span class="stat-icon amber">★</span><div><strong id="favoriteCount">0</strong><span>Favoritos</span></div></article>
           <article class="stat-card"><span class="stat-icon purple">▤</span><div><strong id="categoryCount">0</strong><span>Categorias</span></div></article>
         </div>
 
         <section class="content-card">
-          <div class="section-heading"><div><h2>Seus áudios</h2><p id="listDescription" class="muted">Arraste para alterar a ordem exibida na barra do Telegram.</p></div><button id="clearFilters" class="text-button" type="button" hidden>Limpar filtros</button></div>
+          <div class="section-heading"><div><h2>Seus conteúdos</h2><p id="listDescription" class="muted">Áudios aparecem na extensão; todos os tipos podem ser usados em fluxos.</p></div><button id="clearFilters" class="text-button" type="button" hidden>Limpar filtros</button></div>
           <div class="filters">
             <label class="search-field"><span>⌕</span><input id="search" type="search" placeholder="Buscar por nome…" aria-label="Buscar áudio"></label>
+            <select id="kindFilter" aria-label="Filtrar por tipo"><option value="">Todos os tipos</option><option value="voice">Áudios</option><option value="text">Textos</option><option value="image">Imagens</option><option value="video">Vídeos</option><option value="file">Arquivos</option></select>
             <select id="categoryFilter" aria-label="Filtrar por categoria"><option value="">Todas as categorias</option></select>
             <select id="statusFilter" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="active">Ativos</option><option value="inactive">Desativados</option></select>
             <button id="favoriteFilter" class="filter-button" type="button">☆ Favoritos</button>
           </div>
-          <div class="list-toolbar"><span id="itemsCount" class="list-count">0 áudios</span><span class="list-hint">Clique no ▶ para ouvir uma prévia.</span></div>
+          <div class="list-toolbar"><span id="itemsCount" class="list-count">0 conteúdos</span><span class="list-hint">Use a prévia para conferir o conteúdo.</span></div>
           <div id="audioList" class="audio-list" aria-live="polite"></div>
         </section>
       </section>
 
       <section id="categoriesView" class="view" hidden>
         <section class="content-card categories-card">
-          <div class="section-heading"><div><h2>Categorias</h2><p class="muted">Agrupe os áudios para encontrar tudo com rapidez.</p></div><button id="newCategory" class="primary" type="button">+ Nova categoria</button></div>
+          <div class="section-heading"><div><h2>Categorias</h2><p class="muted">Agrupe os conteúdos para encontrar tudo com rapidez.</p></div><button id="newCategory" class="primary" type="button">+ Nova categoria</button></div>
           <div id="categoryList" class="category-list"></div>
         </section>
+      </section>
+      <section id="flowsView" class="view" hidden>
+        <section class="content-card"><div class="section-heading"><div><h2>Fluxos de mensagens</h2><p class="muted">Combine mensagens, mídia, esperas, respostas e condições. Cada conversa mantém seu próprio estado.</p></div><button id="newFlow" class="primary" type="button">+ Novo fluxo</button></div><p id="flowError" class="form-error" role="alert"></p><div id="flowList"></div></section>
+        <section class="content-card"><div class="section-heading"><div><h2>Execuções por conversa</h2><p class="muted">As últimas 100 execuções. O servidor continua mesmo com este dashboard fechado.</p></div><button id="refreshFlows" class="secondary-button" type="button">Atualizar</button></div><div id="flowRuns" aria-live="polite"></div></section>
       </section>
     </main>
   </div>
 
-  <dialog id="audioDialog" class="modal"><form id="audioForm" method="dialog"><div class="modal-heading"><div><p class="eyebrow">BIBLIOTECA</p><h2 id="audioDialogTitle">Novo áudio</h2></div><button id="closeAudio" class="icon-button" type="button" aria-label="Fechar">×</button></div><div class="form-grid"><label class="full">Nome do áudio<input id="audioName" required maxlength="80" placeholder="Boas-vindas"></label><label>Categoria<select id="audioCategory"></select></label><label>Status<select id="audioActive"><option value="true">Ativo na extensão</option><option value="false">Desativado</option></select></label><label class="full file-field">Arquivo de áudio <span>MP3, M4A, WAV, AAC, OGG, OPUS, MP4 ou WEBM · até 50 MB</span><input id="audioFile" type="file" accept="audio/*,.mp4,.opus,.webm"><small id="audioFileHint">O Render converterá o arquivo para mensagem de voz OGG/Opus.</small></label><div class="local-preview full" id="localPreview" hidden><div class="local-preview-heading"><span>Prévia selecionada</span><span id="localDuration"></span></div><audio id="localAudio" controls></audio></div></div><p id="audioError" class="form-error" role="alert"></p><div class="modal-actions"><button id="cancelAudio" class="secondary-button" type="button">Cancelar</button><button id="saveAudio" class="primary" type="submit">Salvar áudio</button></div></form></dialog>
+  <dialog id="audioDialog" class="modal"><form id="audioForm" method="dialog"><div class="modal-heading"><div><p class="eyebrow">BIBLIOTECA</p><h2 id="audioDialogTitle">Novo conteúdo</h2></div><button id="closeAudio" class="icon-button" type="button" aria-label="Fechar">×</button></div><div class="form-grid"><label class="full">Nome do conteúdo<input id="audioName" required maxlength="80" placeholder="Boas-vindas"></label><label>Tipo<select id="audioKind"><option value="voice">Áudio de voz</option><option value="text">Mensagem de texto</option><option value="image">Imagem</option><option value="video">Vídeo</option><option value="file">Arquivo</option></select></label><label>Categoria<select id="audioCategory"></select></label><label>Status<select id="audioActive"><option value="true">Ativo</option><option value="false">Desativado</option></select></label><label id="audioTextField" class="full" hidden>Mensagem<textarea id="audioText" maxlength="4096" rows="5" placeholder="Digite o texto reutilizável"></textarea></label><label id="audioFileField" class="full file-field">Arquivo <span id="audioFileTypes">Áudio compatível · até 50 MB</span><input id="audioFile" type="file" accept="audio/*,.mp4,.opus,.webm"><small id="audioFileHint">O Render converterá o arquivo para mensagem de voz OGG/Opus.</small></label><div class="local-preview full" id="localPreview" hidden><div class="local-preview-heading"><span>Prévia selecionada</span><span id="localDuration"></span></div><audio id="localAudio" controls></audio></div></div><p id="audioError" class="form-error" role="alert"></p><div class="modal-actions"><button id="cancelAudio" class="secondary-button" type="button">Cancelar</button><button id="saveAudio" class="primary" type="submit">Salvar conteúdo</button></div></form></dialog>
 
   <dialog id="previewDialog" class="modal preview-modal"><div class="modal-heading"><div><p class="eyebrow">PRÉVIA</p><h2 id="previewTitle">Áudio</h2></div><button id="closePreview" class="icon-button" type="button" aria-label="Fechar">×</button></div><div id="previewContent" class="preview-content"><span class="loader"></span></div></dialog>
 
@@ -84,6 +90,8 @@
 
   <dialog id="telegramDialog" class="modal small-modal"><form id="telegramForm"><div class="modal-heading"><div><p class="eyebrow">AUTENTICAÇÃO</p><h2>Conta do Telegram</h2></div><button id="closeTelegram" class="icon-button" type="button" aria-label="Fechar">×</button></div><p id="telegramDialogMessage" class="muted">Use a mesma conta que será atendida pela extensão.</p><div id="telegramPhoneStep"><label>Telefone com DDI<input id="telegramPhone" type="tel" placeholder="+5511999999999" autocomplete="tel"></label><button id="startTelegramLogin" class="primary wide" type="button">Receber código</button></div><div id="telegramCodeStep" hidden><label>Código recebido no Telegram<input id="telegramCode" inputmode="numeric" autocomplete="one-time-code"></label><button id="submitTelegramCode" class="primary wide" type="button">Confirmar código</button></div><div id="telegramPasswordStep" hidden><label>Senha de duas etapas<input id="telegramPassword" type="password" autocomplete="off"></label><button id="submitTelegramPassword" class="primary wide" type="button">Conectar conta</button></div><p id="telegramError" class="form-error" role="alert"></p><div class="modal-actions"><button id="cancelTelegram" class="secondary-button" type="button">Fechar</button></div></form></dialog>
 
+  <dialog id="flowDialog" class="modal flow-editor"><form id="flowForm"><div class="modal-heading"><div><p class="eyebrow">CONSTRUTOR VISUAL</p><h2>Editar fluxo</h2></div><button id="closeFlow" class="icon-button" type="button" aria-label="Fechar">×</button></div><div class="form-grid"><label>Nome<input id="flowName" required maxlength="80"></label><label>Gatilho<select id="flowTrigger"><option value="manual">Iniciar manualmente</option><option value="first_message">Primeira mensagem do lead</option><option value="new_conversation">Nova conversa após 24h</option><option value="keyword">Palavra-chave</option></select></label><label id="flowKeywordsField" class="full" hidden>Palavras-chave separadas por vírgula<input id="flowKeywords" maxlength="1000" placeholder="oi, preço, quero saber"></label><label class="full">Descrição<textarea id="flowDescription" maxlength="500" rows="2" placeholder="Opcional"></textarea></label></div><label class="flow-check"><input id="flowActive" type="checkbox" checked>Fluxo ativo</label><label class="flow-check"><input id="flowPauseOnHuman" type="checkbox" checked>Pausar automaticamente se um atendente enviar mensagem manual</label><div id="flowSteps"></div><div class="flow-actions"><button id="addFlowtext" class="secondary-button" type="button">+ Texto</button><button id="addFlowaudio" class="secondary-button" type="button">+ Conteúdo</button><button id="addFlowwait" class="secondary-button" type="button">+ Espera</button><button id="addFlowreply" class="secondary-button" type="button">+ Esperar resposta</button><button id="addFlowcondition" class="secondary-button" type="button">+ Condição</button><button id="addFlowhandoff" class="secondary-button" type="button">+ Atendimento humano</button><button id="addFlowend" class="secondary-button" type="button">+ Encerrar</button></div><p class="muted">Arraste os cards ou use as setas. Alterações valem somente para novas execuções.</p><p id="flowSaveError" class="form-error" role="alert"></p><button id="saveFlow" class="primary" type="submit">Salvar fluxo</button></form></dialog>
+  <dialog id="flowLogDialog" class="modal"><div class="modal-heading"><h2>Histórico da execução</h2><button id="closeFlowLogs" class="icon-button" type="button" aria-label="Fechar">×</button></div><pre id="flowLogContent"></pre></dialog>
   <div id="toast" class="toast" role="status"></div>
   <script type="module" src="app.js"></script>
 </body>

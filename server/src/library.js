@@ -13,6 +13,21 @@ const orderValue = (value, fallback) => {
   return Number.isFinite(number) && number >= 0 && number <= 100000 ? number : fallback;
 };
 
+const allowedExtensions = {
+  voice:['.mp3','.m4a','.wav','.aac','.ogg','.opus','.mp4','.webm'],
+  image:['.jpg','.jpeg','.png'],
+  video:['.mp4'],
+  file:['.pdf','.doc','.docx','.xls','.xlsx','.txt','.csv','.zip']
+};
+
+const mimeByExtension = {
+  '.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.mp4':'video/mp4',
+  '.pdf':'application/pdf','.doc':'application/msword',
+  '.docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls':'application/vnd.ms-excel','.xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.txt':'text/plain','.csv':'text/csv','.zip':'application/zip'
+};
+
 export class VoiceLibrary {
   constructor(dataDir, store = null) {
     this.store = store;
@@ -81,6 +96,7 @@ export class VoiceLibrary {
   }
   add(file, input = {}) { return this.lock(async()=>{
     const kind = input.kind || 'voice';
+    if(!['voice','text','image','video','file'].includes(kind))throw new Error('Tipo de conteúdo inválido.');
     const existing = await this.read();
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -95,7 +111,7 @@ export class VoiceLibrary {
       createdAt:now,
       updatedAt:now
     };
-    let output;
+    let output,uploaded=false;
     try {
       if (kind === 'text') {
         item.text = String(input.text || '').trim();
@@ -103,8 +119,8 @@ export class VoiceLibrary {
       } else {
         if (!file) throw new Error('Selecione um arquivo.');
         const ext = path.extname(file.originalname).toLowerCase();
-        const allowed = {voice:['.mp3','.m4a','.wav','.aac','.ogg','.opus','.mp4','.webm'],image:['.jpg','.jpeg','.png'],video:['.mp4']};
-        if (!allowed[kind]?.includes(ext)) throw new Error('Formato incompatível com o tipo selecionado.');
+        if (!allowedExtensions[kind]?.includes(ext)) throw new Error('Formato incompatível com o tipo selecionado.');
+        item.originalName = path.basename(file.originalname).slice(0, 180);
         item.storedName = id + (kind === 'voice' ? '.ogg' : ext);
         output = path.join(this.libraryDir, item.storedName);
         if (kind === 'voice') Object.assign(item, await convertToTelegramVoice(file.path,output));
@@ -112,12 +128,16 @@ export class VoiceLibrary {
         else await fs.copyFile(file.path,output);
         item.size = (await fs.stat(output)).size;
         if(this.store) {
-          const mime=kind==='voice'?'audio/ogg':kind==='video'?'video/mp4':ext==='.png'?'image/png':'image/jpeg';
-          await this.store.upload(item.storedName,output,mime);
+          const mime=kind==='voice'?'audio/ogg':mimeByExtension[ext];
+          await this.store.upload(item.storedName,output,mime);uploaded=true;
         }
       }
       const items = await this.read();items.push(item);await this.write(items);return item;
-    } catch(e) { if(output) await fs.rm(output,{force:true}).catch(()=>{}); throw e; }
+    } catch(e) {
+      if(uploaded) await this.store.remove(item.storedName).catch(()=>{});
+      if(output) await fs.rm(output,{force:true}).catch(()=>{});
+      throw e;
+    }
     finally { if(file) await fs.rm(file.path,{force:true}).catch(()=>{}); }
   }); }
   update(id, input) { return this.lock(async()=>{
@@ -137,18 +157,22 @@ export class VoiceLibrary {
 
   replaceFile(id, file) { return this.lock(async()=>{
     const items=await this.read(), item=items.find(x=>x.id===id);
-    if(!item) throw new Error('Áudio não encontrado.');
-    if(item.kind !== 'voice') throw new Error('Somente mensagens de voz podem ter o arquivo substituído.');
+    if(!item) throw new Error('Conteúdo não encontrado.');
+    if(item.kind === 'text') throw new Error('Mensagens de texto não possuem arquivo para substituir.');
     if(!file) throw new Error('Selecione um arquivo.');
     const ext=path.extname(file.originalname).toLowerCase();
-    if(!['.mp3','.m4a','.wav','.aac','.ogg','.opus','.mp4','.webm'].includes(ext)) throw new Error('Formato incompatível com uma mensagem de voz.');
+    if(!allowedExtensions[item.kind]?.includes(ext)) throw new Error('Formato incompatível com este conteúdo.');
     const oldName=item.storedName;
-    const newName=crypto.randomUUID()+'.ogg';
+    const newName=crypto.randomUUID()+(item.kind==='voice'?'.ogg':item.kind==='video'?'.mp4':ext);
     const output=path.join(this.libraryDir,newName);
+    let uploaded=false;
     try {
-      const converted=await convertToTelegramVoice(file.path,output);
-      if(this.store) await this.store.upload(newName,output,'audio/ogg');
-      const replacement={...item,storedName:newName,...converted,size:(await fs.stat(output)).size,updatedAt:new Date().toISOString()};
+      let converted={};
+      if(item.kind==='voice')converted=await convertToTelegramVoice(file.path,output);
+      else if(item.kind==='video')converted=await convertToTelegramVideo(file.path,output);
+      else await fs.copyFile(file.path,output);
+      if(this.store) {await this.store.upload(newName,output,item.kind==='voice'?'audio/ogg':mimeByExtension[path.extname(newName)]);uploaded=true;}
+      const replacement={...item,storedName:newName,originalName:path.basename(file.originalname).slice(0,180),...converted,size:(await fs.stat(output)).size,updatedAt:new Date().toISOString()};
       items[items.findIndex(x=>x.id===id)]=replacement;
       await this.write(items);
       if(oldName && oldName !== newName) {
@@ -157,6 +181,7 @@ export class VoiceLibrary {
       }
       return replacement;
     } catch(e) {
+      if(uploaded) await this.store.remove(newName).catch(()=>{});
       await fs.rm(output,{force:true}).catch(()=>{});
       throw e;
     } finally {
