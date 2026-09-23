@@ -26,12 +26,20 @@ export class Jobs {
           await new Promise(resolve=>{const done=()=>{clearTimeout(timer);job.controller.signal.removeEventListener('abort',done);resolve();};const timer=setTimeout(done,job.steps[i].delay*1000);job.controller.signal.addEventListener('abort',done,{once:true});});}
         if(job.controller.signal.aborted)break;
         job.phase=`Enviando ${i+1}/${items.length}`;
-        const result=await this.telegram.sendItem(items[i],{dialogId:job.dialogId},{recordingDelay:job.steps[i].recordingDelay||0});
+        const result=await this.telegram.sendItem(items[i],{dialogId:job.dialogId},{
+          recordingDelay:job.steps[i].recordingDelay,
+          activity:'auto',
+          signal:job.controller.signal
+        });
         job.sent++;job.messageIds.push(result.messageId);job.updatedAt=Date.now();
       }
       job.state=job.controller.signal.aborted?'cancelled':'done';
       job.phase=job.state==='done'?'Concluído':'Interrompido';
-    }catch(e){job.state='error';job.error=this.telegram.friendlyError(e);job.phase='Falha';}
+    }catch(e){
+      if(job.controller.signal.aborted || e?.name==='ActivityAbortedError'){
+        job.state='cancelled';job.phase='Interrompido';
+      }else{job.state='error';job.error=this.telegram.friendlyError(e);job.phase='Falha';}
+    }
     finally{job.updatedAt=Date.now();}
   }
 }
