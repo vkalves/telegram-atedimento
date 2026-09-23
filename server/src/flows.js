@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+import {ActivityAbortedError} from './activity.js';
 const FLOW_ERRORS=[
  'Execução mudou. Atualize antes de repetir o comando.',
  'Aguarde o envio em andamento antes de pular ou reiniciar.',
@@ -40,6 +41,14 @@ export class FlowStore {
  async init(){await this.list();const capability=await this.rpc('capabilities');if(capability.version!==2)throw new Error('Aplique FLUXOS-PARTE-2.sql antes de iniciar o worker.');this.version=2;}
  requireV2(){if(this.version<2)throw new Error('Aplique FLUXOS-PARTE-2.sql e reinicie o backend para usar respostas e controles.');}
  dispatch(run){return this.rpc('dispatch',{p_id:run.id,p_token:run.claim_token});}
+ async canDispatch(run){
+  if(this.version<2||!run?.id)return true;
+  try{
+   const rows=await this.request(`ta_flow_runs?id=eq.${run.id}&select=status,claim_token,pause_requested,cancel_requested`);
+   const row=Array.isArray(rows)?rows[0]:rows;
+   return !!(row&&row.status==='sending'&&row.claim_token===run.claim_token&&!row.pause_requested&&!row.cancel_requested);
+  }catch{return true;}
+ }
  arm(run,baseline,error=null){return this.rpc('arm',{p_id:run.id,p_token:run.claim_token,p_cursor:baseline?.cursor??0,p_account:baseline?.accountId??null,p_error:error});}
  watch(){return this.rpc('watch');}
  reply(run,page,error=null){return this.rpc('reply',{p_id:run.id,p_wait:run.wait_token,p_poll:run.poll_token,p_step:run.current_step,p_account:page?.accountId??run.reply_account_id,p_dialog:run.dialog_id,p_messages:page?.messages??[],p_cursor:page?.cursor??run.reply_cursor,p_complete:page?.complete??false,p_checked_at:run.reply_checked_at,p_error:error});}
@@ -110,12 +119,25 @@ export class FlowWorker {
    await this.telegram.requireAuthorized();
    // Resolve before marking the external send boundary; never use the browser's current conversation.
    await this.telegram.resolveTarget({dialogId:run.dialog_id});
+   // Presence is not a send. Pause/cancel during typing still blocks dispatch (send_started=false).
+   if(typeof this.telegram.simulateActivity==='function'){
+    try{
+     await this.telegram.simulateActivity(item,{dialogId:run.dialog_id},{
+      activity:'auto',
+      shouldContinue:this.flows.version>=2&&typeof this.flows.canDispatch==='function'?()=>this.flows.canDispatch(run):undefined
+     });
+    }catch(error){
+     if(error instanceof ActivityAbortedError || error?.name==='ActivityAbortedError')return;
+     throw error;
+    }
+   }
    if(this.flows.version>=2&&!await this.flows.dispatch(run))return;
    sending=true;
    const result=await this.telegram.sendItem(item,{dialogId:run.dialog_id});
    // A database failure here must NEVER call sendItem a second time.
    await this.flows.finish(run,'completed',result.messageId);
   }catch(error){
+   if(!sending && (error instanceof ActivityAbortedError || error?.name==='ActivityAbortedError'))return;
    const status=sending?'uncertain':'error';
    try{await this.flows.finish(run,status,null,this.telegram.friendlyError(error));}
    catch{this.logger.error(`Fluxos: execução ${run.id} sem confirmação persistida; não será reenviada.`);}
