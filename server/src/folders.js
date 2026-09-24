@@ -1,5 +1,5 @@
 export function folderTitle(value) {
-  const name = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+  const name = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 12);
   return name || '';
 }
 
@@ -26,7 +26,7 @@ export function nextFilterId(filters) {
 export function planFolderMove({filters, title, peer}) {
   const wanted = folderTitle(title);
   if (!wanted || !peer) return {action: 'skip'};
-  const list = (filters || []).filter(filter => filter && (filter.className === 'DialogFilter' || Number.isInteger(filter.id)));
+  const list = (filters || []).filter(filter => filter && (filter.className === 'DialogFilter' || Number.isInteger(Number(filter.id))));
   const existing = list.find(filter => titleOf(filter).toLocaleLowerCase('pt-BR') === wanted.toLocaleLowerCase('pt-BR'));
   const key = peerKey(peer);
   if (existing) {
