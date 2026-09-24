@@ -60,7 +60,7 @@ export function setupFlows({api,element,button,showToast,getItems}) {
   try{await api(`/flow-runs/${run.id}/control`,{method:'POST',body:{action,version:run.control_version,requestId:commandRequests.get(key)}});commandRequests.delete(key);await refreshRuns();}
   finally{commandBusy.delete(run.id);void refreshRuns().catch(()=>{});}
  }
- function open(flow=null){editing=flow;steps=structuredClone(flow?.steps||[]);$('flowName').value=flow?.name||'';$('flowActive').checked=flow?.active!==false;$('flowSaveError').textContent='';renderSteps();$('flowDialog').showModal();}
+ function open(flow=null){editing=flow;steps=structuredClone(flow?.steps||[]);$('flowName').value=flow?.name||'';$('flowActive').checked=flow?.active!==false;if($('flowDoneFolder'))$('flowDoneFolder').value=flow?.doneFolder||flow?.steps?.[0]?.doneFolder||'';$('flowSaveError').textContent='';renderSteps();$('flowDialog').showModal();}
  function renderSteps(){
   $('flowSteps').replaceChildren();
   steps.forEach((step,index)=>{
@@ -92,7 +92,7 @@ export function setupFlows({api,element,button,showToast,getItems}) {
  $('newFlow').onclick=()=>open();$('closeFlow').onclick=()=>$('flowDialog').close();$('closeFlowLogs').onclick=()=>$('flowLogDialog').close();$('refreshFlows').onclick=refresh;
  $('flowForm').onsubmit=async event=>{
   event.preventDefault();$('saveFlow').disabled=true;$('flowSaveError').textContent='';
-  try{await api('/flows'+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:{name:$('flowName').value,active:$('flowActive').checked,steps,revision:editing?.revision}});$('flowDialog').close();await refresh();showToast('Fluxo salvo.');}
+  try{await api('/flows'+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:{name:$('flowName').value,active:$('flowActive').checked,doneFolder:$('flowDoneFolder')?.value||'',steps,revision:editing?.revision}});$('flowDialog').close();await refresh();showToast('Fluxo salvo.');}
   catch(error){$('flowSaveError').textContent=error.message;}
   finally{$('saveFlow').disabled=false;}
  };
