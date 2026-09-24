@@ -4,7 +4,7 @@ import {encodeSession,decodeSession} from "./session-store.js";
 import { TelegramClient, Api } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
 import {resolveActivityPlan, runTelegramActivity} from "./activity.js";
-import {planFolderMove} from "./folders.js";
+import {applyFolderMove} from "./folders.js";
 
 class Deferred {
   constructor() {
@@ -42,7 +42,6 @@ export class TelegramService {
       const encrypted=this.store ? await this.store.getState("telegram-session") : await fs.readFile(this.sessionPath,"utf8");
       if(encrypted) saved = decodeSession(encrypted,this.encryptionKey);
     } catch (err) { if (err.code !== "ENOENT") throw new Error("Não foi possível abrir a sessão. Verifique a chave de criptografia do servidor."); }
-
     this.sessionPersisted = !!saved;
     this.client = new TelegramClient(new StringSession(saved), this.apiId, this.apiHash, {connectionRetries: 5, floodSleepThreshold: 10});
     await this.client.connect();
@@ -301,29 +300,6 @@ export class TelegramService {
   async addPeerToFolder(dialogId, folderName) {
     await this.requireAuthorized();
     const entity = await this.resolveTarget({dialogId});
-    const peer = await this.client.getInputEntity(entity);
-    const raw = await this.client.invoke(new Api.messages.GetDialogFilters());
-    const filters = Array.isArray(raw) ? raw : (raw?.filters || raw?.dialogFilters || []);
-    const plan = planFolderMove({filters, title: folderName, peer});
-    if (plan.action === 'skip' || plan.action === 'noop') return {moved: plan.action !== 'skip', existed: plan.action === 'noop'};
-    const base = plan.filter || {};
-    const filter = new Api.DialogFilter({
-      id: plan.id,
-      title: plan.title || base.title,
-      emoticon: base.emoticon,
-      pinnedPeers: base.pinnedPeers || [],
-      includePeers: plan.includePeers,
-      excludePeers: base.excludePeers || [],
-      contacts: base.contacts,
-      nonContacts: base.nonContacts,
-      groups: base.groups,
-      broadcasts: base.broadcasts,
-      bots: base.bots,
-      excludeMuted: base.excludeMuted,
-      excludeRead: base.excludeRead,
-      excludeArchived: base.excludeArchived
-    });
-    await this.client.invoke(new Api.messages.UpdateDialogFilter({id: plan.id, filter}));
-    return {moved: true, created: plan.action === 'create'};
+    return applyFolderMove(this.client, entity, folderName);
   }
 }
