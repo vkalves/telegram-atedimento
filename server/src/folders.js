@@ -1,3 +1,5 @@
+import {Api} from 'teleproto';
+
 export function folderTitle(value) {
   const name = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 12);
   return name || '';
@@ -23,6 +25,19 @@ export function nextFilterId(filters) {
   throw new Error('O Telegram atingiu o limite de pastas nesta conta.');
 }
 
+export function listDialogFilters(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.filters)) return raw.filters;
+  if (Array.isArray(raw?.dialogFilters)) return raw.dialogFilters;
+  return [];
+}
+
+function apiTitle(name, existing) {
+  if (existing && typeof existing === 'object') return existing;
+  if (Api.TextWithEntities) return new Api.TextWithEntities({text: name, entities: []});
+  return name;
+}
+
 export function planFolderMove({filters, title, peer}) {
   const wanted = folderTitle(title);
   if (!wanted || !peer) return {action: 'skip'};
@@ -35,4 +50,28 @@ export function planFolderMove({filters, title, peer}) {
     return {action: 'update', id: existing.id, filter: existing, includePeers: [...(existing.includePeers || []), peer]};
   }
   return {action: 'create', id: nextFilterId(list), title: wanted, includePeers: [peer]};
+}
+
+export async function applyFolderMove(client, entity, folderName) {
+  const title = folderTitle(folderName);
+  if (!title) return {moved: false};
+  const peer = await client.getInputEntity(entity);
+  const raw = await client.invoke(new Api.messages.GetDialogFilters());
+  const plan = planFolderMove({filters: listDialogFilters(raw), title, peer});
+  if (plan.action === 'skip' || plan.action === 'noop') return {moved: plan.action !== 'skip', existed: plan.action === 'noop'};
+  const base = plan.filter || {};
+  const filter = new Api.DialogFilter({
+    id: plan.id,
+    title: apiTitle(plan.title || titleOf(base) || title, plan.action === 'update' ? base.title : undefined),
+    pinnedPeers: base.pinnedPeers || [],
+    includePeers: plan.includePeers,
+    excludePeers: base.excludePeers || []
+  });
+  try {
+    await client.invoke(new Api.messages.UpdateDialogFilter({id: plan.id, filter}));
+  } catch {
+    filter.title = title;
+    await client.invoke(new Api.messages.UpdateDialogFilter({id: plan.id, filter}));
+  }
+  return {moved: true, created: plan.action === 'create'};
 }
