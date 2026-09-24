@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {ActivityAbortedError} from './activity.js';
+import {folderNameFromSnapshot, folderTitle} from './folders.js';
 const FLOW_ERRORS=[
  'Execução mudou. Atualize antes de repetir o comando.',
  'Aguarde o envio em andamento antes de pular ou reiniciar.',
@@ -52,6 +53,8 @@ export function validateFlow(input, library) {
   }
   throw new Error('Etapa inválida: use texto, áudio, espera por tempo ou espera por resposta.');
  });
+ const doneFolder=folderTitle(input.doneFolder)||folderTitle(input.steps?.[0]?.doneFolder);
+ if(doneFolder&&steps[0])steps[0]={...steps[0],doneFolder};
  return {name:input.name.trim(),active:input.active,steps};
 }
 export class FlowStore {
@@ -80,8 +83,7 @@ export class FlowStore {
   const result=await this.request('rpc/ta_flow_'+name,'POST',body);
   return ['start','finish','cancel','arm','reply','control'].includes(name)&&Array.isArray(result)?result[0]??null:result;
  }
- list(){return this.request('ta_flows?deleted_at=is.null&order=created_at.desc');
- }
+ list(){return this.request('ta_flows?deleted_at=is.null&order=created_at.desc');}
  async save(input,library,id=null){
   const payload=validateFlow(input,await library.list());
   if(payload.steps.some(step=>step.type==='reply'))this.requireV2();
@@ -101,12 +103,12 @@ export class FlowStore {
  cancel(id){return this.rpc('cancel',{p_id:requireUUID(id)});}
 }
 export class FlowWorker {
- constructor({flows,telegram,library,logger=console}){Object.assign(this,{flows,telegram,library,logger});this.busy=false;this.timer=null;this.pending=new Set();this.replyPending=new Set();this.replyBusy=false;}
+ constructor({flows,telegram,library,logger=console}){Object.assign(this,{flows,telegram,library,logger});this.busy=false;this.timer=null;this.pending=new Set();this.replyPending=new Set();this.replyBusy=false;this.folderNotified=new Set();}
  start(){if(this.timer)return;this.timer=setInterval(()=>{void this.tick();void this.pollReplies();},1000);this.timer.unref?.();void this.tick();}
  stop(){clearInterval(this.timer);this.timer=null;}
  async tick(){
   if(this.busy||this.pending.size>=20)return;this.busy=true;
-  try{const runs=await this.flows.claim();for(const run of runs){const task=this.execute(run);this.pending.add(task);void task.finally(()=>this.pending.delete(task));}}
+  try{const runs=await this.flows.claim();for(const run of runs){const task=this.execute(run);this.pending.add(task);void task.finally(()=>this.pending.delete(task));}if(typeof this.flows.runs==='function'){const recent=await this.flows.runs();for(const run of recent)void this.maybeMoveToFolder(run);}}
   catch(error){this.logger.error('Fluxos: não foi possível consultar/persistir a fila.',error.message);}
   finally{this.busy=false;}
  }
@@ -114,7 +116,7 @@ export class FlowWorker {
   if(this.flows.version<2||this.flows.version===undefined||this.replyBusy||this.replyPending.size>=20)return;
   this.replyBusy=true;
   try{const runs=await this.flows.watch();for(const run of runs){const task=(async()=>{
-   try{const page=await this.telegram.flowReplyPage(run);await this.flows.reply(run,page);}
+   try{const page=await this.telegram.flowReplyPage(run);const updated=await this.flows.reply(run,page);await this.maybeMoveToFolder(updated);}
    catch(error){try{await this.flows.reply(run,null,this.telegram.friendlyError(error));}catch{this.logger.error('Fluxos: consulta de respostas indisponível; estado preservado.');}}
   })();this.replyPending.add(task);void task.finally(()=>this.replyPending.delete(task));}}catch(error){this.logger.error('Fluxos: fila de respostas indisponível.',error.message);}
   finally{this.replyBusy=false;}
@@ -150,12 +152,21 @@ export class FlowWorker {
    if(this.flows.version>=2&&!await this.flows.dispatch(run))return;
    sending=true;
    const result=await this.telegram.sendItem(item,{dialogId:run.dialog_id},{skipActivity:true});
-   await this.flows.finish(run,'completed',result.messageId);
+   const updated=await this.flows.finish(run,'completed',result.messageId);
+   await this.maybeMoveToFolder(updated);
   }catch(error){
    if(!sending && (error instanceof ActivityAbortedError || error?.name==='ActivityAbortedError'))return;
    const status=sending?'uncertain':'error';
    try{await this.flows.finish(run,status,null,this.telegram.friendlyError(error));}
    catch{this.logger.error(`Fluxos: execução ${run.id} sem confirmação persistida; não será reenviada.`);}
   }
+ }
+ async maybeMoveToFolder(run){
+  if(!run||run.status!=='done'||this.folderNotified.has(run.id))return;
+  const folder=folderNameFromSnapshot(run.snapshot);
+  if(!folder||typeof this.telegram.addPeerToFolder!=='function'){this.folderNotified.add(run.id);return;}
+  this.folderNotified.add(run.id);
+  try{await this.telegram.addPeerToFolder(run.dialog_id,folder);}
+  catch(error){this.logger.error('Fluxos: não foi possível mover o lead para a pasta do Telegram.',this.telegram.friendlyError?.(error)||error.message);}
  }
 }
