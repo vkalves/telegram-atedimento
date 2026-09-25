@@ -13,7 +13,7 @@ test('validates three supported types and rejects missing/inactive audio, variab
 });
 test('worker reuses existing voice library and sender without recording indicators',async()=>{
  const f=fixture();await new FlowWorker(f).execute(run);
- assert.deepEqual(f.sent,[[voice,{dialogId:'123'}]]);assert.equal(f.results[0][1],'completed');assert.equal(f.results[0][2],'42');
+ assert.deepEqual(f.sent,[[voice,{dialogId:'123'},{skipActivity:true}]]);assert.equal(f.results[0][1],'completed');assert.equal(f.results[0][2],'42');
 });
 test('missing audio fails before sending; external failures are uncertain and never retried',async()=>{
  const f=fixture();f.library.get=async()=>null;await new FlowWorker(f).execute(run);assert.equal(f.sent.length,0);assert.equal(f.results[0][1],'error');

@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#f5f8fb">
-  <title>Telegram Atendimento 4.0 · Dashboard</title>
+  <title>Televoice · Central de atendimento</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="support.css">
 </head>
 <body>
   <div id="connectionGate" class="gate" hidden>
     <section class="gate-card">
-      <div class="brand large"><span class="brand-mark">♫</span><div><strong>Telegram Atendimento <small>4.0</small></strong><span>Biblioteca de áudios</span></div></div>
+      <div class="brand large"><span class="brand-mark">♫</span><div><strong>Telegram Televoice <small>6.2</small></strong><span>Biblioteca de áudios</span></div></div>
       <h1>Conecte seu dashboard</h1>
       <p class="muted">Use o endereço do Render e o ACCESS_TOKEN configurado no servidor. A extensão usa a senha separada EXTENSION_PASSWORD.</p>
       <form id="connectionForm" class="stack-form">
@@ -25,11 +26,13 @@
   <div id="appShell" class="app-shell" hidden>
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-top">
-        <div class="brand"><span class="brand-mark">♫</span><div><strong>Atendimento <small>4.0</small></strong><span>Central de áudios</span></div></div>
+        <div class="brand"><span class="brand-mark">♫</span><div><strong>Televoice <small>6.2</small></strong><span>Central de atendimento</span></div></div>
         <button id="closeSidebar" class="icon-button mobile-only" type="button" aria-label="Fechar menu">×</button>
       </div>
       <nav class="navigation" aria-label="Navegação do dashboard">
-        <button class="nav-item active" data-view="library" type="button"><span class="nav-icon">▦</span> Biblioteca <span id="navAudioCount" class="nav-count">0</span></button>
+        <button class="nav-item active" data-view="support" type="button"><span class="nav-icon">◉</span> Atendimento</button>
+        <button class="nav-item" data-view="replies" type="button"><span class="nav-icon">≡</span> Respostas prontas</button>
+        <button class="nav-item" data-view="library" type="button"><span class="nav-icon">▦</span> Biblioteca <span id="navAudioCount" class="nav-count">0</span></button>
         <button class="nav-item" data-view="categories" type="button"><span class="nav-icon">▤</span> Categorias</button>
       <button class="nav-item" data-view="flows" type="button"><span class="nav-icon">↳</span> Fluxos</button>
       </nav>
@@ -43,11 +46,13 @@
 
     <main class="main-content">
       <header class="topbar">
-        <div class="topbar-heading"><button id="openSidebar" class="icon-button mobile-only" type="button" aria-label="Abrir menu">☰</button><div><p class="eyebrow">BIBLIOTECA DE ÁUDIOS</p><h1 id="pageTitle">Organize seu atendimento</h1><p class="subtitle">Deixe as respostas certas a um clique da conversa.</p></div></div>
+        <div class="topbar-heading"><button id="openSidebar" class="icon-button mobile-only" type="button" aria-label="Abrir menu">☰</button><div><p class="eyebrow">SEU ESPAÇO DE TRABALHO</p><h1 id="pageTitle">Central de atendimento</h1><p class="subtitle">Deixe as respostas certas a um clique da conversa.</p></div></div>
         <div class="topbar-actions"><button id="refresh" class="secondary-button" type="button">↻ <span>Atualizar</span></button><button id="newAudio" class="primary" type="button">+ Novo áudio</button></div>
       </header>
 
-      <section id="libraryView" class="view">
+      <section id="supportView" class="view"></section>
+      <section id="repliesView" class="view" hidden></section>
+      <section id="libraryView" class="view" hidden>
         <div class="stats-grid">
           <article class="stat-card"><span class="stat-icon blue">♫</span><div><strong id="totalCount">0</strong><span>Total de áudios</span></div></article>
           <article class="stat-card"><span class="stat-icon green">✓</span><div><strong id="activeCount">0</strong><span>Ativos na extensão</span></div></article>
@@ -58,9 +63,11 @@
         <section class="content-card">
           <div class="section-heading"><div><h2>Seus áudios</h2><p id="listDescription" class="muted">Arraste para alterar a ordem exibida na barra do Telegram.</p></div><button id="clearFilters" class="text-button" type="button" hidden>Limpar filtros</button></div>
           <div class="filters">
-            <label class="search-field"><span>⌕</span><input id="search" type="search" placeholder="Buscar por nome…" aria-label="Buscar áudio"></label>
+            <label class="search-field"><span>⌕</span><input id="search" type="search" placeholder="Buscar por nome ou categoria… (Ctrl+K)" aria-label="Buscar áudio"></label>
             <select id="categoryFilter" aria-label="Filtrar por categoria"><option value="">Todas as categorias</option></select>
             <select id="statusFilter" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="active">Ativos</option><option value="inactive">Desativados</option></select>
+            <select id="sortFilter" aria-label="Ordenar áudios"><option value="manual">Ordem da extensão</option><option value="name">Nome A–Z</option><option value="category">Categoria</option><option value="favorite">Favoritos primeiro</option></select>
+            <button id="densityToggle" class="filter-button" type="button" aria-pressed="false">Linhas compactas</button>
             <button id="favoriteFilter" class="filter-button" type="button">☆ Favoritos</button>
           </div>
           <div class="list-toolbar"><span id="itemsCount" class="list-count">0 áudios</span><span class="list-hint">Clique no ▶ para ouvir uma prévia.</span></div>

@@ -22,7 +22,7 @@ test('actual extension starts one flow bound to the captured conversation and re
   await new Promise(resolve=>setImmediate(resolve));
   const root=w.document.getElementById('telegram-atendimento-5-audio-bar').shadowRoot;
   assert.ok([...root.querySelectorAll('button')].some(b=>b.textContent==='Áudio existente'));
-  let select=root.querySelector('select');assert.ok(select);select.value='flow';select.dispatchEvent(new w.Event('change'));
+  let select=root.querySelector('select[aria-label="Selecionar fluxo"]');assert.ok(select);select.value='flow';select.dispatchEvent(new w.Event('change'));
   const start=[...root.querySelectorAll('button')].find(b=>b.textContent==='Iniciar fluxo');assert.equal(start.disabled,false);start.click();start.click();
   await new Promise(resolve=>setImmediate(resolve));
   const posts=calls.filter(c=>c.path==='/flow-runs'&&c.method==='POST');assert.equal(posts.length,1);assert.equal(posts[0].body.dialogId,'123');assert.equal(posts[0].body.peerKey,'123');assert.ok(posts[0].body.requestId);

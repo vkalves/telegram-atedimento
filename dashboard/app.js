@@ -1,7 +1,8 @@
+import {setupSupport} from './support.js';
 import {setupFlows} from './flows.js';
 const $ = id => document.getElementById(id);
 const connectionStorageKey = 'telegram-atendimento-4-dashboard-connection';
-const state = {connection:null,items:[],categories:[],view:'library',favoriteOnly:false,editingAudio:null,editingCategory:null,localPreviewUrl:null,previewUrl:null,toastTimer:null,loading:false,telegramAuthBusy:false,telegramStatusBusy:false,telegramPoll:null};
+const state = {connection:null,items:[],categories:[],view:'support',favoriteOnly:false,editingAudio:null,editingCategory:null,localPreviewUrl:null,previewUrl:null,toastTimer:null,loading:false,telegramAuthBusy:false,telegramStatusBusy:false,telegramPoll:null};
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -28,6 +29,7 @@ function showConnectionGate(error = '') {
 function showApp() {
   $('connectionGate').hidden=true;$('appShell').hidden=false;
   $('connectedUrl').textContent=state.connection?.url || '—';
+  setView(state.view);
 }
 
 function normalizeUrl(value) {
@@ -75,12 +77,17 @@ function categoryName(item) {return item.category || 'Geral';}
 
 function filteredItems() {
   const query=$('search').value.trim().toLocaleLowerCase('pt-BR'),category=$('categoryFilter').value,status=$('statusFilter').value;
-  return state.items.filter(item=>
-    (!query||String(item.name||'').toLocaleLowerCase('pt-BR').includes(query))&&
+  const found=state.items.filter(item=>
+    (!query||[item.name,categoryName(item)].some(value=>String(value||'').toLocaleLowerCase('pt-BR').includes(query)))&&
     (!category||categoryName(item)===category)&&
     (!status||(status==='active'?item.active!==false:item.active===false))&&
     (!state.favoriteOnly||item.favorite===true)
   );
+  const sort=$('sortFilter').value;
+  if(sort==='name')found.sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR'));
+  if(sort==='category')found.sort((a,b)=>categoryName(a).localeCompare(categoryName(b),'pt-BR')||String(a.name).localeCompare(String(b.name),'pt-BR'));
+  if(sort==='favorite')found.sort((a,b)=>Number(!!b.favorite)-Number(!!a.favorite));
+  return found;
 }
 
 function renderStats() {
@@ -106,7 +113,7 @@ function renderCategoryOptions() {
 function render() {
   renderStats();renderCategoryOptions();renderAudioList();renderCategories();
   $('favoriteFilter').classList.toggle('active',state.favoriteOnly);
-  const hasFilter=$('search').value||$('categoryFilter').value||$('statusFilter').value||state.favoriteOnly;
+  const hasFilter=$('search').value||$('categoryFilter').value||$('statusFilter').value||$('sortFilter').value!=='manual'||state.favoriteOnly;
   $('clearFilters').hidden=!hasFilter;
 }
 
@@ -157,7 +164,7 @@ function renderAudioList() {
   const list=$('audioList');list.replaceChildren();
   const items=filteredItems();
   $('itemsCount').textContent=`${items.length} ${items.length===1?'áudio':'áudios'}`;
-  const canReorder=!$('search').value&&!$('categoryFilter').value&&!$('statusFilter').value&&!state.favoriteOnly;
+  const canReorder=!$('search').value&&!$('categoryFilter').value&&!$('statusFilter').value&&!state.favoriteOnly&&$('sortFilter').value==='manual';
   $('listDescription').textContent=canReorder?'Arraste para alterar a ordem exibida na barra do Telegram.':'Limpe os filtros para reorganizar a biblioteca.';
   if(!items.length){
     const empty=element('div',undefined,'empty-state');empty.append(element('strong',state.items.length?'Nenhum áudio encontrado':'Sua biblioteca está vazia'),element('p',state.items.length?'Tente ajustar os filtros.':'Adicione seu primeiro áudio para começar.'),button('+ Novo áudio',()=>openAudioDialog(),'primary'));list.append(empty);return;
@@ -262,8 +269,10 @@ async function deleteCategory(category) {
 }
 
 function setView(view) {
+  $('supportView').hidden=view!=='support';$('repliesView').hidden=view!=='replies';supportUI.activate(view);
+  $('newAudio').hidden=view!=='library';$('refresh').hidden=['support','replies'].includes(view);
   $('flowsView').hidden=view!=='flows';if(view==='flows')void flowUI.refresh();
-  state.view=view;$('libraryView').hidden=view!=='library';$('categoriesView').hidden=view!=='categories';$('pageTitle').textContent=view==='library'?'Organize seu atendimento':view==='flows'?'Fluxos de mensagens':'Categorias da biblioteca';
+  state.view=view;$('libraryView').hidden=view!=='library';$('categoriesView').hidden=view!=='categories';$('pageTitle').textContent=({support:'Central de atendimento',replies:'Respostas prontas',library:'Biblioteca de áudios',flows:'Fluxos de mensagens',categories:'Categorias da biblioteca'})[view];
   document.querySelectorAll('.nav-item').forEach(item=>item.classList.toggle('active',item.dataset.view===view));$('sidebar').classList.remove('open');
 }
 
@@ -281,6 +290,7 @@ async function start() {
   try{await loadData();await loadTelegramStatus();}catch(error){showConnectionGate(error.message);}
 }
 
+const supportUI=setupSupport({api,element,button,showToast});
 const flowUI=setupFlows({api,element,button,showToast,getItems:()=>state.items});
 
 $('connectionForm').addEventListener('submit',connect);
@@ -291,9 +301,12 @@ $('closePreview').addEventListener('click',()=>$('previewDialog').close());$('pr
 $('newCategory').addEventListener('click',()=>openCategoryDialog());$('cancelCategory').addEventListener('click',()=>$('categoryDialog').close());$('closeCategory').addEventListener('click',()=>$('categoryDialog').close());
 $('connectTelegram').addEventListener('click',openTelegramDialog);$('startTelegramLogin').addEventListener('click',()=>telegramAction('/auth/start',{phone:$('telegramPhone').value},'startTelegramLogin'));$('submitTelegramCode').addEventListener('click',()=>telegramAction('/auth/code',{code:$('telegramCode').value},'submitTelegramCode'));$('submitTelegramPassword').addEventListener('click',()=>telegramAction('/auth/password',{password:$('telegramPassword').value},'submitTelegramPassword'));$('cancelTelegram').addEventListener('click',()=>$('telegramDialog').close());$('closeTelegram').addEventListener('click',()=>$('telegramDialog').close());$('telegramForm').addEventListener('submit',event=>event.preventDefault());$('telegramDialog').addEventListener('close',()=>{clearInterval(state.telegramPoll);state.telegramPoll=null;});
 $('audioFile').addEventListener('change',()=>{const file=$('audioFile').files[0];clearLocalPreview();$('audioError').textContent='';if(!file)return;if(file.size>50*1024*1024){$('audioError').textContent='O arquivo excede 50 MB.';return;}state.localPreviewUrl=URL.createObjectURL(file);$('localAudio').src=state.localPreviewUrl;$('localAudio').onloadedmetadata=()=>{$('localDuration').textContent=formatDuration($('localAudio').duration);};$('localPreview').hidden=false;});
-$('search').addEventListener('input',renderAudioList);$('categoryFilter').addEventListener('change',renderAudioList);$('statusFilter').addEventListener('change',renderAudioList);$('favoriteFilter').addEventListener('click',()=>{state.favoriteOnly=!state.favoriteOnly;render();});$('clearFilters').addEventListener('click',()=>{$('search').value='';$('categoryFilter').value='';$('statusFilter').value='';state.favoriteOnly=false;render();});
+$('search').addEventListener('input',renderAudioList);$('sortFilter').addEventListener('change',renderAudioList);
+$('densityToggle').addEventListener('click',()=>{const compact=document.body.classList.toggle('compact-list');$('densityToggle').setAttribute('aria-pressed',String(compact));$('densityToggle').textContent=compact?'Linhas confortáveis':'Linhas compactas';localStorage.setItem('ta-compact-list',String(compact));});
+if(localStorage.getItem('ta-compact-list')==='true')$('densityToggle').click();
+document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'&&!$('appShell').hidden){event.preventDefault();const field=state.view==='support'?$('deskSearch'):state.view==='replies'?$('replySearch'):$('search');if(!['support','replies','library'].includes(state.view))setView('library');field.focus();field.select();}});$('categoryFilter').addEventListener('change',renderAudioList);$('statusFilter').addEventListener('change',renderAudioList);$('favoriteFilter').addEventListener('click',()=>{state.favoriteOnly=!state.favoriteOnly;render();});$('clearFilters').addEventListener('click',()=>{$('search').value='';$('categoryFilter').value='';$('statusFilter').value='';$('sortFilter').value='manual';state.favoriteOnly=false;render();});
 $('refresh').addEventListener('click',async()=>{try{await loadData();showToast('Biblioteca atualizada.');}catch(error){showToast(error.message,'error');}});
-$('disconnect').addEventListener('click',()=>{localStorage.removeItem(connectionStorageKey);state.connection=null;showConnectionGate();});
+$('disconnect').addEventListener('click',()=>{localStorage.removeItem(connectionStorageKey);state.connection=null;supportUI.disconnect();showConnectionGate();});
 $('openSidebar').addEventListener('click',()=>$('sidebar').classList.add('open'));$('closeSidebar').addEventListener('click',()=>$('sidebar').classList.remove('open'));
 document.querySelectorAll('.nav-item').forEach(item=>item.addEventListener('click',()=>setView(item.dataset.view)));
 setInterval(()=>{if(!$('appShell').hidden&&!state.loading)loadData().catch(()=>{});},30000);

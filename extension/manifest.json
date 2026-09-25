@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Telegram Atendimento 5",
-  "version": "5.2.0",
+  "name": "Televoice · Central de Atendimento",
+  "version": "6.2.0",
   "minimum_chrome_version": "116",
-  "description": "Barra prática para enviar áudios como mensagem de voz no Telegram Web.",
+  "description": "Organize leads, retornos, respostas prontas, áudios e fluxos dentro do Telegram Web.",
   "permissions": [
     "storage"
   ],
@@ -26,6 +26,7 @@
         "https://web.telegram.org/*"
       ],
       "js": [
+        "support.js",
         "content.js"
       ],
       "run_at": "document_idle"
