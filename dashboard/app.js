@@ -75,12 +75,17 @@ function categoryName(item) {return item.category || 'Geral';}
 
 function filteredItems() {
   const query=$('search').value.trim().toLocaleLowerCase('pt-BR'),category=$('categoryFilter').value,status=$('statusFilter').value;
-  return state.items.filter(item=>
-    (!query||String(item.name||'').toLocaleLowerCase('pt-BR').includes(query))&&
+  const found=state.items.filter(item=>
+    (!query||[item.name,categoryName(item)].some(value=>String(value||'').toLocaleLowerCase('pt-BR').includes(query)))&&
     (!category||categoryName(item)===category)&&
     (!status||(status==='active'?item.active!==false:item.active===false))&&
     (!state.favoriteOnly||item.favorite===true)
   );
+  const sort=$('sortFilter').value;
+  if(sort==='name')found.sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR'));
+  if(sort==='category')found.sort((a,b)=>categoryName(a).localeCompare(categoryName(b),'pt-BR')||String(a.name).localeCompare(String(b.name),'pt-BR'));
+  if(sort==='favorite')found.sort((a,b)=>Number(!!b.favorite)-Number(!!a.favorite));
+  return found;
 }
 
 function renderStats() {
@@ -106,7 +111,7 @@ function renderCategoryOptions() {
 function render() {
   renderStats();renderCategoryOptions();renderAudioList();renderCategories();
   $('favoriteFilter').classList.toggle('active',state.favoriteOnly);
-  const hasFilter=$('search').value||$('categoryFilter').value||$('statusFilter').value||state.favoriteOnly;
+  const hasFilter=$('search').value||$('categoryFilter').value||$('statusFilter').value||$('sortFilter').value!=='manual'||state.favoriteOnly;
   $('clearFilters').hidden=!hasFilter;
 }
 
@@ -291,7 +296,10 @@ $('closePreview').addEventListener('click',()=>$('previewDialog').close());$('pr
 $('newCategory').addEventListener('click',()=>openCategoryDialog());$('cancelCategory').addEventListener('click',()=>$('categoryDialog').close());$('closeCategory').addEventListener('click',()=>$('categoryDialog').close());
 $('connectTelegram').addEventListener('click',openTelegramDialog);$('startTelegramLogin').addEventListener('click',()=>telegramAction('/auth/start',{phone:$('telegramPhone').value},'startTelegramLogin'));$('submitTelegramCode').addEventListener('click',()=>telegramAction('/auth/code',{code:$('telegramCode').value},'submitTelegramCode'));$('submitTelegramPassword').addEventListener('click',()=>telegramAction('/auth/password',{password:$('telegramPassword').value},'submitTelegramPassword'));$('cancelTelegram').addEventListener('click',()=>$('telegramDialog').close());$('closeTelegram').addEventListener('click',()=>$('telegramDialog').close());$('telegramForm').addEventListener('submit',event=>event.preventDefault());$('telegramDialog').addEventListener('close',()=>{clearInterval(state.telegramPoll);state.telegramPoll=null;});
 $('audioFile').addEventListener('change',()=>{const file=$('audioFile').files[0];clearLocalPreview();$('audioError').textContent='';if(!file)return;if(file.size>50*1024*1024){$('audioError').textContent='O arquivo excede 50 MB.';return;}state.localPreviewUrl=URL.createObjectURL(file);$('localAudio').src=state.localPreviewUrl;$('localAudio').onloadedmetadata=()=>{$('localDuration').textContent=formatDuration($('localAudio').duration);};$('localPreview').hidden=false;});
-$('search').addEventListener('input',renderAudioList);$('categoryFilter').addEventListener('change',renderAudioList);$('statusFilter').addEventListener('change',renderAudioList);$('favoriteFilter').addEventListener('click',()=>{state.favoriteOnly=!state.favoriteOnly;render();});$('clearFilters').addEventListener('click',()=>{$('search').value='';$('categoryFilter').value='';$('statusFilter').value='';state.favoriteOnly=false;render();});
+$('search').addEventListener('input',renderAudioList);$('sortFilter').addEventListener('change',renderAudioList);
+$('densityToggle').addEventListener('click',()=>{const compact=document.body.classList.toggle('compact-list');$('densityToggle').setAttribute('aria-pressed',String(compact));$('densityToggle').textContent=compact?'Linhas confortáveis':'Linhas compactas';localStorage.setItem('ta-compact-list',String(compact));});
+if(localStorage.getItem('ta-compact-list')==='true')$('densityToggle').click();
+document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'&&!$('appShell').hidden){event.preventDefault();setView('library');$('search').focus();$('search').select();}});$('categoryFilter').addEventListener('change',renderAudioList);$('statusFilter').addEventListener('change',renderAudioList);$('favoriteFilter').addEventListener('click',()=>{state.favoriteOnly=!state.favoriteOnly;render();});$('clearFilters').addEventListener('click',()=>{$('search').value='';$('categoryFilter').value='';$('statusFilter').value='';$('sortFilter').value='manual';state.favoriteOnly=false;render();});
 $('refresh').addEventListener('click',async()=>{try{await loadData();showToast('Biblioteca atualizada.');}catch(error){showToast(error.message,'error');}});
 $('disconnect').addEventListener('click',()=>{localStorage.removeItem(connectionStorageKey);state.connection=null;showConnectionGate();});
 $('openSidebar').addEventListener('click',()=>$('sidebar').classList.add('open'));$('closeSidebar').addEventListener('click',()=>$('sidebar').classList.remove('open'));

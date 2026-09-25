@@ -58,9 +58,11 @@
         <section class="content-card">
           <div class="section-heading"><div><h2>Seus áudios</h2><p id="listDescription" class="muted">Arraste para alterar a ordem exibida na barra do Telegram.</p></div><button id="clearFilters" class="text-button" type="button" hidden>Limpar filtros</button></div>
           <div class="filters">
-            <label class="search-field"><span>⌕</span><input id="search" type="search" placeholder="Buscar por nome…" aria-label="Buscar áudio"></label>
+            <label class="search-field"><span>⌕</span><input id="search" type="search" placeholder="Buscar por nome ou categoria… (Ctrl+K)" aria-label="Buscar áudio"></label>
             <select id="categoryFilter" aria-label="Filtrar por categoria"><option value="">Todas as categorias</option></select>
             <select id="statusFilter" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="active">Ativos</option><option value="inactive">Desativados</option></select>
+            <select id="sortFilter" aria-label="Ordenar áudios"><option value="manual">Ordem da extensão</option><option value="name">Nome A–Z</option><option value="category">Categoria</option><option value="favorite">Favoritos primeiro</option></select>
+            <button id="densityToggle" class="filter-button" type="button" aria-pressed="false">Linhas compactas</button>
             <button id="favoriteFilter" class="filter-button" type="button">☆ Favoritos</button>
           </div>
           <div class="list-toolbar"><span id="itemsCount" class="list-count">0 áudios</span><span class="list-hint">Clique no ▶ para ouvir uma prévia.</span></div>
