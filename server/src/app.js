@@ -4,7 +4,7 @@ import multer from 'multer';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import {Jobs} from './jobs.js';
-export function createApp({telegram,library,sequences,categories=null,flows=null,token,extensionPassword='',extensionIds=[],dashboardOrigins=[]}){
+export function createApp({telegram,library,sequences,categories=null,flows=null,support=null,inbox=null,token,extensionPassword='',extensionIds=[],dashboardOrigins=[]}){
  if(!token||token.length<32)throw new Error('Configure um ACCESS_TOKEN com pelo menos 32 caracteres.');
  if(extensionPassword&&extensionPassword.length<8)throw new Error('Configure EXTENSION_PASSWORD com pelo menos 8 caracteres.');
  const app=express(),jobs=new Jobs(telegram,library),rates=new Map(),loginRates=new Map();
@@ -46,6 +46,20 @@ export function createApp({telegram,library,sequences,categories=null,flows=null
  app.post('/auth/code',(q,r)=>{if(!q.body.code)throw new Error('Informe o código.');telegram.submitCode(String(q.body.code).trim());r.json({ok:true});});
  app.post('/auth/password',(q,r)=>{if(!q.body.password)throw new Error('Informe a senha.');telegram.submitPassword(String(q.body.password));r.json({ok:true});});
  app.post('/context',async(q,r)=>r.json({target:await telegram.currentTarget(String(q.body.peerKey||''))}));
+ app.use('/support',(_q,r,next)=>support&&inbox?next():r.status(503).json({error:'Aplique ATENDIMENTO.sql no Supabase e reinicie a API para habilitar a central de atendimento.'}));
+ app.get('/support/queue',async(q,r)=>{const account=await inbox.accountId();r.json({...await support.queue(account,q.query),account,health:inbox.health()});});
+ app.post('/support/import',async(_q,r)=>r.json(await inbox.importRecent()));
+ app.post('/support/lead',async(q,r)=>{
+  const target=await telegram.currentTarget(String(q.body.peerKey||''));
+  if(target.id!==String(q.body.dialogId))throw new Error('A conversa mudou. Abra o painel novamente.');
+  r.json({lead:await support.ingest(await inbox.accountId(),target)});
+ });
+ app.patch('/support/leads/:id',async(q,r)=>r.json({lead:await support.patch(await inbox.accountId(),q.params.id,q.body)}));
+ app.post('/support/bulk',async(q,r)=>r.json({results:await support.bulk(await inbox.accountId(),q.body)}));
+ app.get('/support/replies',async(_q,r)=>r.json({items:await support.replies()}));
+ app.post('/support/replies',async(q,r)=>r.json({item:await support.saveReply(q.body)}));
+ app.patch('/support/replies/:id',async(q,r)=>r.json({item:await support.saveReply(q.body,q.params.id)}));
+ app.delete('/support/replies/:id',async(q,r)=>r.json({ok:await support.removeReply(q.params.id,q.body.version)}));
  app.get('/library',async(q,r)=>{
   let items=await library.list();
   if(q.query.kind)items=items.filter(item=>(item.kind||'voice')===String(q.query.kind));
@@ -94,7 +108,7 @@ export function createApp({telegram,library,sequences,categories=null,flows=null
  app.use((err,_q,r,_n)=>{
   const messages={LIMIT_FILE_SIZE:'O arquivo excede 50 MB.',LIMIT_FIELD_SIZE:'Os dados do formulário excedem o limite permitido.',LIMIT_FIELD_COUNT:'O formulário contém campos demais.',LIMIT_PART_COUNT:'O formulário contém partes demais.',LIMIT_UNEXPECTED_FILE:'Campo de arquivo inesperado.'};
   const message=messages[err.code]||telegram.friendlyError(err);
-  r.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:message});
+  r.status(err.status===409?409:err.code==='LIMIT_FILE_SIZE'?413:400).json({error:message});
  });
  return app;
 }

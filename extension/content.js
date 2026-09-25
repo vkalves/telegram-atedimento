@@ -1,6 +1,6 @@
 (() => {
   const HOST_ID = 'telegram-atendimento-5-audio-bar';
-  const VERSION = '6.1.0';
+  const VERSION = '6.2.0';
   const CONTEXT_RETRY_DELAYS = [1200, 3000, 7000];
   const LEGACY_HOST_ID = 'telegram-atendimento-4-audio-bar';
   const legacyHost = document.getElementById(LEGACY_HOST_ID);
@@ -44,7 +44,8 @@
     :host{all:initial;color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     *{box-sizing:border-box}
     button{font:600 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;border:0;cursor:pointer;white-space:nowrap}
-    .bar{display:flex;align-items:center;gap:7px;min-height:52px;width:100%;max-width:var(--chat-input-max-width,720px);margin:5px auto 0;padding:7px 9px;border:1px solid #30363c;border-radius:11px;background:#202428;box-shadow:0 7px 22px rgba(0,0,0,.34);color:#f2f5f7;overflow:hidden}
+    .dock-heading{display:flex;align-items:center;gap:8px;max-width:var(--chat-input-max-width,720px);margin:5px auto 0;padding:8px 10px 0;color:#d0e3e7;background:#202d34;border:1px solid #3c515a;border-bottom:0;border-radius:12px 12px 0 0;font-size:11px}.dock-heading strong{color:#8dd9c7;font-size:12px}.dock-person{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dock-heading button{background:#315049;color:#c5f3e6;padding:7px 9px;border-radius:7px}.dock-heading select{max-width:130px;width:auto;background:#263c45;color:#c4dbe2;border:1px solid #46606a;padding:6px;border-radius:6px;font:11px sans-serif}.dock-heading .star-filter[aria-pressed=true]{background:#655a32;color:#ffe2a3}.flow-strip{display:flex;align-items:center;gap:8px;max-width:var(--chat-input-max-width,720px);margin:0 auto;background:#202d34;padding:0 10px 8px;overflow-x:auto;color:#adbec6;border:1px solid #3c515a;border-top:0;border-radius:0 0 12px 12px}.flow-strip:empty{display:none}.flow-strip .audio{font-size:10px;height:29px;background:#30404c;color:#c0cdd8}.flow-strip span{max-width:340px;overflow:hidden;text-overflow:ellipsis}.flow-strip select{font-size:11px}
+    .bar{display:flex;align-items:center;gap:7px;min-height:52px;width:100%;max-width:var(--chat-input-max-width,720px);margin:0 auto;padding:7px 9px;border:1px solid #3c515a;border-top:0;border-bottom:0;border-radius:0;background:#202d34;box-shadow:0 7px 22px rgba(0,0,0,.34);color:#f2f5f7;overflow:hidden}
     .dashboard{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:38px;padding:0 10px;border-radius:9px;flex:0 0 auto;color:#fff;background:#30363b;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
     .dashboard:hover{background:#3b444b}.dashboard:active{transform:scale(.97)}.dashboard:disabled{opacity:.58;cursor:wait}
     .dashboard svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -64,6 +65,7 @@
     [hidden]{display:none!important}
     @media (max-width:700px){.message{display:none}.scroll-control{width:31px}.dashboard{padding:0 9px}.dashboard-label{display:none}}
   </style>
+  <div class="dock-heading"><strong>Televoice</strong><span class="dock-person">Abra uma conversa</span><select class="dock-category" aria-label="Categoria dos áudios"><option value="">Categorias</option></select><button class="star-filter" type="button" aria-pressed="false" title="Mostrar apenas favoritos" aria-label="Mostrar apenas favoritos">★</button><button class="open-central" type="button" title="Central de atendimento · Alt+A">Atendimento</button></div>
   <div class="bar" role="region" aria-label="Áudios de atendimento">
     <button class="dashboard" type="button" title="Abrir dashboard" aria-label="Abrir dashboard"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg><span class="dashboard-label">Dashboard</span></button>
     <input class="quick-search" type="search" placeholder="Buscar áudio…" aria-label="Buscar áudio" title="Ctrl+K para buscar áudio"><span class="quick-count" aria-live="polite"></span>
@@ -71,7 +73,7 @@
     <div class="items"></div>
     <button class="scroll-control next" type="button" title="Próximos áudios" aria-label="Mostrar próximos áudios" hidden><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
     <span class="message" aria-live="polite"></span>
-  </div>`;
+  </div><div class="flow-strip" role="region" aria-label="Fluxo desta conversa"></div>`;
 
   document.documentElement.append(host);
 
@@ -86,7 +88,15 @@
   const messageElement = root.querySelector('.message');
   const previousButton = root.querySelector('.previous');
   const nextButton = root.querySelector('.next');
+  const flowItems = root.querySelector('.flow-strip');
+  const categorySelect = root.querySelector('.dock-category');
+  const favoriteToggle = root.querySelector('.star-filter');
+  let favoriteOnly=false;
+  favoriteToggle.onclick=()=>{favoriteOnly=!favoriteOnly;favoriteToggle.setAttribute('aria-pressed',String(favoriteOnly));render();};
+  categorySelect.onchange=()=>{categorySelect.blur();render();};
   const state = {key:null,target:null,stamp:'',generation:0,configured:false,items:[],loading:false,contextLoading:false,error:''};
+  const supportUI=globalThis.TelevoiceSupport?.({api,getActiveFlow:()=>activeFlow(),takeOver:run=>controlFlow(run,'human')});
+  root.querySelector('.open-central').onclick=()=>supportUI?.toggle();
   const inFlight = new Map();
   let availableFlows=[],flowRuns=[],flowSelected='',flowBusy=false,flowLoading=false,flowError='';
   const flowRequests=new Map();
@@ -103,26 +113,27 @@
     finally{flowLoading=false;render();}
   }
   function renderFlows(){
+    flowItems.replaceChildren();
     if(!state.configured||!state.target)return;
     const run=activeFlow();
     const select=document.createElement('select');select.setAttribute('aria-label','Selecionar fluxo');select.style.cssText='flex:0 0 auto;max-width:170px;background:#30363c;color:white;border-radius:7px;padding:8px';
     select.add(new Option('Selecionar fluxo',''));for(const flow of availableFlows)select.add(new Option(flow.name,flow.id));
     select.value=flowSelected;select.disabled=!!run||flowBusy;select.onchange=()=>{flowSelected=select.value;select.blur();render();};
     const start=document.createElement('button');start.type='button';start.className='audio';start.textContent=run?'Fluxo em andamento':'Iniciar fluxo';start.disabled=flowBusy||!!run||!flowSelected||!availableFlows.some(f=>f.id===flowSelected);start.title=flowError||'Executar na conversa atual';start.onclick=startFlow;
-    itemsElement.prepend(select,start);
-    if(flowError){const note=document.createElement('span');note.textContent='Fluxos indisponíveis';note.title=flowError;itemsElement.append(note);}
+    flowItems.prepend(select,start);
+    if(flowError){const note=document.createElement('span');note.textContent='Fluxos indisponíveis';note.title=flowError;flowItems.append(note);}
     const shown=run||flowRuns.find(item=>item.dialog_id===String(state.target.id));
     if(shown){
       const labels={running:'executando',waiting:'aguardando tempo',sending:'enviando',arming_reply:'preparando espera',awaiting_reply:'aguardando resposta',paused:'pausado',done:'concluído',cancelled:'cancelado',error:'erro',uncertain:'conferir envio'};
       const status=document.createElement('span');status.style.cssText='white-space:nowrap;flex:0 0 auto;font-size:11px';
       status.textContent=`Fluxo ${run?'ativo':'recente'}: ${shown.snapshot.name} · Status: ${labels[shown.status]||shown.status} · Etapa atual: ${Math.min(shown.current_step+1,shown.snapshot.steps.length)} de ${shown.snapshot.steps.length}${shown.current_step_label?' ('+shown.current_step_label+')':''}${shown.next_step_label?' · Próxima: '+shown.next_step_label:''}${shown.pause_requested?' · Pausa pendente':''}${shown.human_takeover?' · Atendimento humano':''}`;
-      status.title=shown.error||status.textContent;itemsElement.append(status);
+      status.title=shown.error||status.textContent;flowItems.append(status);
       const actions=[];
       if(run&&run.status!=='uncertain')actions.push(run.status==='paused'?['resume','Continuar fluxo']:['pause','Pausar fluxo'],['human','Assumir atendimento']);
       if(run)actions.push(['cancel','Cancelar fluxo']);
       if(run&&!['sending','uncertain'].includes(run.status))actions.push(['skip','Pular etapa']);
       if(!['sending','uncertain'].includes(shown.status))actions.push(['restart','Reiniciar fluxo']);
-      for(const [action,label] of actions){const control=document.createElement('button');control.type='button';control.className='audio';control.textContent=label;control.disabled=flowBusy;control.onclick=()=>controlFlow(shown,action);itemsElement.append(control);}
+      for(const [action,label] of actions){const control=document.createElement('button');control.type='button';control.className='audio';control.textContent=label;control.disabled=flowBusy;control.onclick=()=>controlFlow(shown,action);flowItems.append(control);}
     }
   }
   const flowCommands=new Map();
@@ -364,6 +375,7 @@
 
   function render() {
     if(root.activeElement?.tagName==='SELECT' && state.stamp===location.href)return;
+    root.querySelector('.dock-person').textContent=state.target?.name|| (state.contextLoading?'Identificando conversa…':'Abra uma conversa');
     const previousScroll = itemsElement.scrollLeft;
     itemsElement.replaceChildren();
     if (!state.key || !findComposer()) {host.style.display = 'none';clearChatReserve();return;}
@@ -385,9 +397,9 @@
     } else if (state.error) {
       const retry = document.createElement('button');retry.type='button';retry.className='setup';retry.textContent='Tentar novamente';retry.onclick=()=>{clearContextRetry();contextAttempt=0;state.error='';syncContext(true);};itemsElement.append(retry);
     } else {
-      const matching = state.items.filter(item => !searchQuery || [item.name,item.category].some(value => String(value||'').toLocaleLowerCase('pt-BR').includes(searchQuery)));
+      const matching = state.items.filter(item => (!favoriteOnly||item.favorite)&&(!categorySelect.value||(item.category||'Geral')===categorySelect.value)&&(!searchQuery || [item.name,item.category].some(value => String(value||'').toLocaleLowerCase('pt-BR').includes(searchQuery))));
       quickCount.textContent=searchQuery ? `${matching.length}/${state.items.length}` : String(state.items.length);
-      if(searchQuery && !matching.length){const empty=document.createElement('span');empty.className='message';empty.textContent='Nenhum áudio encontrado';itemsElement.append(empty);}
+      if(!matching.length&&state.items.length){const empty=document.createElement('span');empty.className='message';empty.textContent='Nenhum áudio encontrado';itemsElement.append(empty);}
       for (const item of [...matching].sort((a,b)=>Number(!!b.favorite)-Number(!!a.favorite))) {
         const sendable = Boolean(item.storedName);
         const button = document.createElement('button');button.type='button';button.className=`audio${sendable?'':' unavailable'}${item.favorite?' favorite':''}`;button.title=sendable?`Enviar ${item.name}`:`${item.name}: arquivo não disponível`;button.setAttribute('aria-label',sendable?`Enviar ${item.name}`:`${item.name}: arquivo não disponível`);button.disabled=!state.target||!!busy||!sendable;
@@ -418,6 +430,7 @@
       // needed for that specific item. The render step disables only the
       // unusable record, so a missing file can never be sent accidentally.
       state.items=(data.items || []).filter(item => (item.kind || 'voice') === 'voice' && item.active !== false);
+      const currentCategory=categorySelect.value;categorySelect.replaceChildren(new Option('Categorias',''));for(const category of [...new Set(state.items.map(item=>item.category||'Geral'))].sort())categorySelect.add(new Option(category,category));categorySelect.value=currentCategory;
       state.error='';
     } catch (error) {state.error=error.message;}
     finally {state.loading=false;libraryBusy=false;render();}
@@ -460,6 +473,7 @@
       return;
     }
     const target=state.target,key=state.key,stamp=location.href;
+    if(!confirm(`Enviar o áudio “${item.name}” para ${target.name}?`))return;
     inFlight.set(String(target.id),{jobId:null,label:item.name,startedAt:Date.now()});render();
     try {
       const freshKey=peerFromURL(location.href);
@@ -481,14 +495,14 @@
     const sameStamp = stamp === state.stamp;
     clearContextRetry();
     if (!sameStamp) contextAttempt=0;
-    state.stamp=stamp;state.key=key;state.target=null;state.error='';state.contextLoading=!!key && state.configured;state.generation++;
+    state.stamp=stamp;state.key=key;state.target=null;state.error='';state.contextLoading=!!key && state.configured;state.generation++;supportUI?.setTarget(null,key);
     const generation=state.generation;render();
     if (!key || !state.configured) {state.contextLoading=false;render();return;}
     try {
       const data=await api('/context',{method:'POST',body:{peerKey:key}});
       if (generation !== state.generation) return;
       if (!data?.target || data.target.id === undefined || data.target.id === null) throw new Error('Não consegui identificar a conversa atual.');
-      state.target={...data.target,id:String(data.target.id)};void loadFlows();state.error='';state.contextLoading=false;contextAttempt=0;render();await refreshRunningJob();
+      state.target={...data.target,id:String(data.target.id)};supportUI?.setTarget(state.target,key);void loadFlows();state.error='';state.contextLoading=false;contextAttempt=0;render();await refreshRunningJob();
     } catch (error) {
       if (generation !== state.generation) return;
       if (isPermanentContextError(error)) {

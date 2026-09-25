@@ -1,7 +1,8 @@
+import {setupSupport} from './support.js';
 import {setupFlows} from './flows.js';
 const $ = id => document.getElementById(id);
 const connectionStorageKey = 'telegram-atendimento-4-dashboard-connection';
-const state = {connection:null,items:[],categories:[],view:'library',favoriteOnly:false,editingAudio:null,editingCategory:null,localPreviewUrl:null,previewUrl:null,toastTimer:null,loading:false,telegramAuthBusy:false,telegramStatusBusy:false,telegramPoll:null};
+const state = {connection:null,items:[],categories:[],view:'support',favoriteOnly:false,editingAudio:null,editingCategory:null,localPreviewUrl:null,previewUrl:null,toastTimer:null,loading:false,telegramAuthBusy:false,telegramStatusBusy:false,telegramPoll:null};
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -28,6 +29,7 @@ function showConnectionGate(error = '') {
 function showApp() {
   $('connectionGate').hidden=true;$('appShell').hidden=false;
   $('connectedUrl').textContent=state.connection?.url || '—';
+  setView(state.view);
 }
 
 function normalizeUrl(value) {
@@ -162,7 +164,7 @@ function renderAudioList() {
   const list=$('audioList');list.replaceChildren();
   const items=filteredItems();
   $('itemsCount').textContent=`${items.length} ${items.length===1?'áudio':'áudios'}`;
-  const canReorder=!$('search').value&&!$('categoryFilter').value&&!$('statusFilter').value&&!state.favoriteOnly;
+  const canReorder=!$('search').value&&!$('categoryFilter').value&&!$('statusFilter').value&&!state.favoriteOnly&&$('sortFilter').value==='manual';
   $('listDescription').textContent=canReorder?'Arraste para alterar a ordem exibida na barra do Telegram.':'Limpe os filtros para reorganizar a biblioteca.';
   if(!items.length){
     const empty=element('div',undefined,'empty-state');empty.append(element('strong',state.items.length?'Nenhum áudio encontrado':'Sua biblioteca está vazia'),element('p',state.items.length?'Tente ajustar os filtros.':'Adicione seu primeiro áudio para começar.'),button('+ Novo áudio',()=>openAudioDialog(),'primary'));list.append(empty);return;
@@ -267,8 +269,10 @@ async function deleteCategory(category) {
 }
 
 function setView(view) {
+  $('supportView').hidden=view!=='support';$('repliesView').hidden=view!=='replies';supportUI.activate(view);
+  $('newAudio').hidden=view!=='library';$('refresh').hidden=['support','replies'].includes(view);
   $('flowsView').hidden=view!=='flows';if(view==='flows')void flowUI.refresh();
-  state.view=view;$('libraryView').hidden=view!=='library';$('categoriesView').hidden=view!=='categories';$('pageTitle').textContent=view==='library'?'Organize seu atendimento':view==='flows'?'Fluxos de mensagens':'Categorias da biblioteca';
+  state.view=view;$('libraryView').hidden=view!=='library';$('categoriesView').hidden=view!=='categories';$('pageTitle').textContent=({support:'Central de atendimento',replies:'Respostas prontas',library:'Biblioteca de áudios',flows:'Fluxos de mensagens',categories:'Categorias da biblioteca'})[view];
   document.querySelectorAll('.nav-item').forEach(item=>item.classList.toggle('active',item.dataset.view===view));$('sidebar').classList.remove('open');
 }
 
@@ -286,6 +290,7 @@ async function start() {
   try{await loadData();await loadTelegramStatus();}catch(error){showConnectionGate(error.message);}
 }
 
+const supportUI=setupSupport({api,element,button,showToast});
 const flowUI=setupFlows({api,element,button,showToast,getItems:()=>state.items});
 
 $('connectionForm').addEventListener('submit',connect);
@@ -299,9 +304,9 @@ $('audioFile').addEventListener('change',()=>{const file=$('audioFile').files[0]
 $('search').addEventListener('input',renderAudioList);$('sortFilter').addEventListener('change',renderAudioList);
 $('densityToggle').addEventListener('click',()=>{const compact=document.body.classList.toggle('compact-list');$('densityToggle').setAttribute('aria-pressed',String(compact));$('densityToggle').textContent=compact?'Linhas confortáveis':'Linhas compactas';localStorage.setItem('ta-compact-list',String(compact));});
 if(localStorage.getItem('ta-compact-list')==='true')$('densityToggle').click();
-document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'&&!$('appShell').hidden){event.preventDefault();setView('library');$('search').focus();$('search').select();}});$('categoryFilter').addEventListener('change',renderAudioList);$('statusFilter').addEventListener('change',renderAudioList);$('favoriteFilter').addEventListener('click',()=>{state.favoriteOnly=!state.favoriteOnly;render();});$('clearFilters').addEventListener('click',()=>{$('search').value='';$('categoryFilter').value='';$('statusFilter').value='';$('sortFilter').value='manual';state.favoriteOnly=false;render();});
+document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'&&!$('appShell').hidden){event.preventDefault();const field=state.view==='support'?$('deskSearch'):state.view==='replies'?$('replySearch'):$('search');if(!['support','replies','library'].includes(state.view))setView('library');field.focus();field.select();}});$('categoryFilter').addEventListener('change',renderAudioList);$('statusFilter').addEventListener('change',renderAudioList);$('favoriteFilter').addEventListener('click',()=>{state.favoriteOnly=!state.favoriteOnly;render();});$('clearFilters').addEventListener('click',()=>{$('search').value='';$('categoryFilter').value='';$('statusFilter').value='';$('sortFilter').value='manual';state.favoriteOnly=false;render();});
 $('refresh').addEventListener('click',async()=>{try{await loadData();showToast('Biblioteca atualizada.');}catch(error){showToast(error.message,'error');}});
-$('disconnect').addEventListener('click',()=>{localStorage.removeItem(connectionStorageKey);state.connection=null;showConnectionGate();});
+$('disconnect').addEventListener('click',()=>{localStorage.removeItem(connectionStorageKey);state.connection=null;supportUI.disconnect();showConnectionGate();});
 $('openSidebar').addEventListener('click',()=>$('sidebar').classList.add('open'));$('closeSidebar').addEventListener('click',()=>$('sidebar').classList.remove('open'));
 document.querySelectorAll('.nav-item').forEach(item=>item.addEventListener('click',()=>setView(item.dataset.view)));
 setInterval(()=>{if(!$('appShell').hidden&&!state.loading)loadData().catch(()=>{});},30000);
